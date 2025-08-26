@@ -110,9 +110,9 @@ class LOOOOPApp {
         const importArea = document.getElementById('importArea');
         const timeline = document.getElementById('timelineTrack');
         
-        // メディアプールへのドロップ
+        // メディアプールへのドロップ（thisコンテキストを修正）
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            importArea.addEventListener(eventName, this.preventDefaults, false);
+            importArea.addEventListener(eventName, this.preventDefaults.bind(this), false);
         });
         
         ['dragenter', 'dragover'].forEach(eventName => {
@@ -128,12 +128,18 @@ class LOOOOPApp {
         });
         
         importArea.addEventListener('drop', (e) => {
-            const files = Array.from(e.dataTransfer.files)
-                .filter(file => file.type.startsWith('video/'));
-            
-            if (files.length > 0) {
-                const filePaths = files.map(file => file.path);
-                this.addVideosToMediaPool(filePaths);
+            try {
+                const files = Array.from(e.dataTransfer.files)
+                    .filter(file => file.type.startsWith('video/'));
+                
+                if (files.length > 0) {
+                    const filePaths = files.map(file => file.path);
+                    this.addVideosToMediaPool(filePaths);
+                } else {
+                    console.warn('No video files found in dropped items');
+                }
+            } catch (error) {
+                console.error('Error processing dropped files:', error);
             }
         }, false);
     }
