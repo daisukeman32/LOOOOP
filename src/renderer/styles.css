@@ -260,7 +260,7 @@ body {
     background-color: #000;
 }
 
-.reset-button {
+.reset-button, .set-button {
     width: 100%;
     background-color: #666;
     color: white;
@@ -270,10 +270,19 @@ body {
     cursor: pointer;
     font-size: 12px;
     transition: background-color 0.3s ease;
+    margin-top: 8px;
 }
 
-.reset-button:hover {
+.reset-button:hover, .set-button:hover {
     background-color: #777;
+}
+
+.set-button {
+    background-color: #0078d4;
+}
+
+.set-button:hover {
+    background-color: #106ebe;
 }
 
 /* タイムラインパネル */
