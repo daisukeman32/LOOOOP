@@ -23,7 +23,7 @@ body {
 /* メインレイアウト */
 .main-layout {
     display: grid;
-    grid-template-columns: 250px 1fr 300px;
+    grid-template-columns: 220px 1fr 300px;
     gap: 1px;
     height: 70vh;
     background-color: #3e3e3e;
@@ -46,69 +46,99 @@ body {
     border-bottom: 1px solid #3e3e3e;
 }
 
-/* メディアプール */
+/* コンパクトなメディアプール */
 .media-pool-content {
     flex: 1;
-    padding: 12px;
+    padding: 8px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .import-area {
-    height: 100%;
-    border: 2px dashed #555;
-    border-radius: 8px;
+    height: 80px;
+    border: 1px dashed #666;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: border-color 0.3s ease;
+    transition: all 0.2s ease;
+    background: rgba(42, 42, 42, 0.3);
+    flex-shrink: 0;
+}
+
+.import-area:hover {
+    border-color: #0078d4;
+    background: rgba(0, 120, 212, 0.1);
 }
 
 .import-area.drag-over {
-    border-color: #0078d4;
-    background-color: #0078d420;
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.15);
+    border-style: solid;
 }
 
 .import-placeholder {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .import-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
+    font-size: 24px;
+    color: #888;
 }
 
 .import-placeholder p {
-    margin: 12px 0;
-    color: #cccccc;
-    font-size: 14px;
+    margin: 0;
+    color: #bbb;
+    font-size: 12px;
+    display: none;
 }
 
 .import-button {
-    background-color: #0078d4;
+    background: linear-gradient(135deg, #0078d4 0%, #106ebe 100%);
     color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
+    padding: 6px 12px;
+    border-radius: 3px;
     cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
 }
 
 .import-button:hover {
-    background-color: #106ebe;
+    background: linear-gradient(135deg, #106ebe 0%, #0078d4 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 120, 212, 0.3);
 }
 
-/* メディアクリップ */
+/* コンパクトなメディアクリップ */
 .media-clip {
     width: 100%;
-    height: 120px;
-    background-color: #3e3e3e;
-    border: 1px solid #555;
-    border-radius: 4px;
-    margin-bottom: 8px;
+    height: 90px;
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    border: 1px solid #4a4a4a;
+    border-radius: 3px;
+    margin-bottom: 6px;
     position: relative;
     cursor: grab;
     overflow: hidden;
+    transition: all 0.2s ease;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.media-clip:hover {
+    border-color: #0078d4;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 2px 4px rgba(0, 120, 212, 0.3);
 }
 
 .media-clip:active {
@@ -116,24 +146,30 @@ body {
 }
 
 .media-clip.selected {
-    border-color: #0078d4;
-    box-shadow: 0 0 0 2px #0078d4;
+    border-color: #4CAF50;
+    box-shadow: 
+        0 0 0 2px rgba(76, 175, 80, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%);
 }
 
 .thumbnail-container {
     width: 100%;
-    height: 80%;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #1a1a1a;
+    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+    border-radius: 2px;
+    margin: 3px;
 }
 
 .thumbnail-container img {
-    max-width: 100%;
-    max-height: 100%;
+    max-width: calc(100% - 6px);
+    max-height: calc(100% - 6px);
     object-fit: contain;
-    border-radius: 2px;
+    border-radius: 1px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .media-clip .clip-name {
@@ -141,12 +177,15 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 4px 8px;
-    background-color: rgba(0, 0, 0, 0.8);
-    font-size: 12px;
+    padding: 2px 6px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.9) 100%);
+    font-size: 10px;
+    font-weight: 600;
+    color: #eee;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 /* プレビューパネル */
@@ -353,21 +392,6 @@ body {
     border-color: #0078d4;
 }
 
-/* 速度曲線エディタ */
-.speed-curve-editor {
-    width: 100%;
-    height: 200px;
-    background-color: #000;
-    border: 1px solid #555;
-    border-radius: 4px;
-    margin-bottom: 8px;
-}
-
-#speedCurveSvg {
-    width: 100%;
-    height: 100%;
-    background-color: #000;
-}
 
 .reset-button, .set-button {
     width: 100%;
@@ -702,134 +726,331 @@ body {
     background: #666;
 }
 
-/* 新しい速度パターン選択 */
-.speed-pattern-selector {
+/* リッチな速度曲線エディタ */
+.speed-curve-editor-rich {
     margin-top: 8px;
-}
-
-.speed-preset-select {
-    width: 100%;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, #3e3e3e 0%, #4e4e4e 100%);
-    color: white;
-    border: 1px solid #555;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.speed-preset-select:hover {
-    background: linear-gradient(135deg, #4e4e4e 0%, #5e5e5e 100%);
-    border-color: #666;
-}
-
-.speed-preset-select:focus {
-    outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
-}
-
-/* カスタムスピードコントロール */
-.custom-speed-controls {
-    margin-top: 15px;
-    padding: 15px;
-    background: rgba(42, 42, 42, 0.5);
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    border: 2px solid #333;
     border-radius: 8px;
-    border: 1px solid #444;
+    padding: 8px;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
-.speed-slider-label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 12px;
+#speedCurveSvg {
+    width: 100%;
+    height: 240px;
+    background: linear-gradient(135deg, #111 0%, #222 100%);
+    border-radius: 4px;
+    border: 1px solid #2a2a2a;
+}
+
+/* コントロールポイントのインタラクション */
+.control-point {
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.control-point:hover {
+    r: 10;
+    stroke-width: 4;
+    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.5));
+}
+
+.control-point.active {
+    r: 12;
+    fill: #4CAF50;
+    stroke-width: 4;
+    stroke: #ffffff;
+    filter: drop-shadow(0 4px 12px rgba(76, 175, 80, 0.8));
+}
+
+/* 端点ポイントのスタイル */
+.control-point.endpoint {
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(255, 107, 107, 0.4));
+}
+
+.control-point.endpoint:hover {
+    r: 10;
+    stroke-width: 3;
+    filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.6));
+}
+
+.control-point.endpoint.active {
+    r: 12;
+    fill: #ff4757;
+    stroke-width: 4;
+    stroke: #ffffff;
+    filter: drop-shadow(0 4px 12px rgba(255, 71, 87, 0.8));
+}
+
+/* 精密制御パネル */
+.curve-precision-panel {
+    margin-top: 12px;
+    background: rgba(42, 42, 42, 0.8);
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.precision-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.precision-label {
+    font-size: 11px;
     color: #ccc;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.speed-slider-label span {
-    float: right;
+.precision-values {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.value-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.value-item label {
+    font-size: 10px;
     color: #4CAF50;
+    font-family: 'Consolas', monospace;
     font-weight: bold;
+    min-width: 20px;
 }
 
-.speed-slider {
-    width: 100%;
-    height: 6px;
-    background: linear-gradient(135deg, #333 0%, #444 100%);
+.value-item input {
+    width: 45px;
+    padding: 3px 5px;
+    background: #1a1a1a;
+    color: #fff;
+    border: 1px solid #555;
     border-radius: 3px;
+    font-size: 10px;
+    font-family: 'Consolas', monospace;
+    text-align: center;
+}
+
+.value-item input:focus {
     outline: none;
-    margin-bottom: 15px;
-    -webkit-appearance: none;
-    cursor: pointer;
+    border-color: #4CAF50;
+    box-shadow: 0 0 4px rgba(76, 175, 80, 0.3);
 }
 
-.speed-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-    transition: all 0.2s ease;
+.value-item span {
+    font-size: 9px;
+    color: #888;
+    font-family: 'Consolas', monospace;
 }
 
-.speed-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+/* 曲線コントロールボタン */
+.speed-curve-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
 }
 
-.speed-slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    border-radius: 50%;
-    cursor: pointer;
+.reset-button, .apply-button {
+    flex: 1;
+    padding: 8px 12px;
     border: none;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-}
-
-/* 速度プレビューキャンバス */
-.speed-curve-preview {
-    margin-top: 15px;
-}
-
-.speed-curve-preview label {
-    display: block;
-    margin-bottom: 8px;
+    border-radius: 4px;
     font-size: 12px;
-    color: #ccc;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-#speedPreviewCanvas {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-    border: 1px solid #444;
-    border-radius: 6px;
-    width: 100%;
-    height: 80px;
+.reset-button {
+    background: linear-gradient(135deg, #666 0%, #555 100%);
+    color: #ccc;
+    border: 1px solid #777;
+}
+
+.reset-button:hover {
+    background: linear-gradient(135deg, #777 0%, #666 100%);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .apply-button {
-    width: 100%;
-    margin-top: 15px;
-    padding: 10px 12px;
     background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
     color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    border: 1px solid #45a049;
 }
 
 .apply-button:hover {
     background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
 }
 
-.apply-button:active {
+.apply-button:active, .reset-button:active {
     transform: translateY(0);
+}
+
+/* ワイド速度曲線エディタ */
+.speed-curve-editor-wide {
+    margin-top: 15px;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.speed-curve-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.speed-curve-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #e0e0e0;
+    font-weight: 600;
+}
+
+.speed-curve-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.speed-curve-buttons .reset-button,
+.speed-curve-buttons .apply-button {
+    padding: 4px 8px;
+    font-size: 11px;
+    min-width: 50px;
+}
+
+#speedCurveSvgWide {
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #111 0%, #222 100%);
+    border-radius: 4px;
+    border: 1px solid #2a2a2a;
+}
+
+/* ワイド版コントロールポイント */
+.control-point-wide {
+    transition: all 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+
+.control-point-wide:hover {
+    r: 8;
+    stroke-width: 3;
+    filter: drop-shadow(0 4px 8px rgba(76, 175, 80, 0.5));
+}
+
+.control-point-wide.active {
+    r: 10;
+    fill: #4CAF50;
+    stroke-width: 3;
+    stroke: #ffffff;
+    filter: drop-shadow(0 4px 12px rgba(76, 175, 80, 0.8));
+}
+
+/* ワイド版端点ポイント */
+.control-point-wide.endpoint {
+    filter: drop-shadow(0 2px 4px rgba(255, 107, 107, 0.4));
+}
+
+.control-point-wide.endpoint:hover {
+    r: 8;
+    stroke-width: 3;
+    filter: drop-shadow(0 4px 8px rgba(255, 107, 107, 0.6));
+}
+
+.control-point-wide.endpoint.active {
+    r: 10;
+    fill: #ff4757;
+    stroke-width: 3;
+    stroke: #ffffff;
+    filter: drop-shadow(0 4px 12px rgba(255, 71, 87, 0.8));
+}
+
+/* ワイド版精密制御パネル */
+.curve-precision-panel-wide {
+    margin-top: 8px;
+    background: rgba(42, 42, 42, 0.6);
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.precision-info-wide {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.precision-label-wide {
+    font-size: 11px;
+    color: #ccc;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 60px;
+}
+
+.precision-values-wide {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.value-item-wide {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.value-item-wide label {
+    font-size: 10px;
+    color: #4CAF50;
+    font-family: 'Consolas', monospace;
+    font-weight: bold;
+    min-width: 18px;
+}
+
+.value-item-wide input {
+    width: 55px;
+    padding: 2px 4px;
+    background: #1a1a1a;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-size: 10px;
+    font-family: 'Consolas', monospace;
+    text-align: center;
+}
+
+.value-item-wide input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 3px rgba(76, 175, 80, 0.3);
+}
+
+.value-item-wide span {
+    font-size: 9px;
+    color: #888;
+    font-family: 'Consolas', monospace;
 }

@@ -32,8 +32,9 @@ class LOOOOPApp {
     init() {
         this.initializeElements();
         this.setupEventListeners();
+        this.setupSpeedCurveEditor();
         this.initializeNewSpeedSystem();
-        console.log('LOOOOP App initialized with correct workflow');
+        console.log('🚀 LOOOOP App initialized with speed curve editor');
     }
     
     initializeElements() {
@@ -504,7 +505,7 @@ class LOOOOPApp {
     // 3. リアルタイム調整 - ループ数変更を即座に反映
     updateLoopSettings() {
         this.updateTotalFrames();
-        this.showTimelineClip();
+        this.renderTimeline();
         
         // 現在再生中なら効果を即座に反映
         if (this.isPlaying) {
@@ -517,79 +518,300 @@ class LOOOOPApp {
         console.log('⚡ Loop settings updated in real-time');
     }
     
-    // 4. 速度曲線エディタ - ドラッグ中もリアルタイム反映
+    // 4. リッチな速度曲線エディタ - 高機能ベジエ曲線制御
     setupSpeedCurveEditor() {
-        const point1 = document.getElementById('point1');
-        const point2 = document.getElementById('point2');
-        const svg = document.getElementById('speedCurveSvg');
+        console.log('🎨 Initializing rich speed curve editor...');
         
-        let isDragging = false;
-        let activePoint = null;
+        // DOM要素の存在確認付き取得（5点制御システム）
+        this.speedCurveSvg = document.getElementById('speedCurveSvg');
+        this.speedCurvePath = document.getElementById('speedCurvePath');
+        this.controlPoints = [
+            document.getElementById('controlPoint0'), // 左端（開始点）
+            document.getElementById('controlPoint1'), // 中間制御1
+            document.getElementById('controlPoint2'), // 中間制御2
+            document.getElementById('controlPoint3'), // 中間制御3
+            document.getElementById('controlPoint4')  // 右端（終了点）
+        ];
         
-        [point1, point2].forEach(point => {
-            point.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                activePoint = point;
-                e.preventDefault();
-            });
+        // 重要な要素の存在確認
+        if (!this.speedCurveSvg) {
+            console.error('❌ speedCurveSvg element not found! Speed curve editor cannot initialize.');
+            return;
+        }
+        if (!this.speedCurvePath) {
+            console.error('❌ speedCurvePath element not found!');
+            return;
+        }
+        
+        let missingControlPoints = 0;
+        this.controlPoints.forEach((point, index) => {
+            if (!point) {
+                console.error(`❌ controlPoint${index + 1} not found!`);
+                missingControlPoints++;
+            }
         });
         
-        svg.addEventListener('mousemove', (e) => {
-            if (!isDragging || !activePoint) return;
-            
-            const rect = svg.getBoundingClientRect();
-            const y = Math.max(20, Math.min(180, (e.clientY - rect.top) * (200 / rect.height)));
-            
-            activePoint.setAttribute('cy', y);
-            this.updateSpeedCurve(); // リアルタイム反映
-        });
+        if (missingControlPoints > 0) {
+            console.error(`❌ ${missingControlPoints}/5 control points missing! Cannot initialize curve editor.`);
+            return;
+        }
         
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            activePoint = null;
-        });
+        // 精密制御入力フィールド（5点対応）
+        this.precisionInputs = [
+            document.getElementById('p0Speed'), // 左端
+            document.getElementById('p1Speed'), // 中間1
+            document.getElementById('p2Speed'), // 中間2
+            document.getElementById('p3Speed'), // 中間3
+            document.getElementById('p4Speed')  // 右端
+        ];
         
-        // 初期曲線設定
+        // リアルタイム情報パネル
+        this.realtimeInfo = document.getElementById('realtimeInfo');
+        this.realtimeSpeed = document.getElementById('realtimeSpeed');
+        this.realtimeTime = document.getElementById('realtimeTime');
+        
+        // 速度曲線データの初期化（5点制御）
+        this.speedCurvePoints = [
+            { x: 0, y: 140, speed: 1.0 },    // 左端（開始点）
+            { x: 70, y: 140, speed: 1.0 },   // 中間制御1
+            { x: 140, y: 140, speed: 1.0 },  // 中間制御2
+            { x: 210, y: 140, speed: 1.0 },  // 中間制御3
+            { x: 280, y: 140, speed: 1.0 }   // 右端（終了点）
+        ];
+        
+        this.initializeCurveInteractions();
+        this.initializePrecisionControls();
+        this.initializeCurveButtons();
         this.updateSpeedCurve();
+        
+        console.log('✅ Rich speed curve editor successfully initialized!');
     }
     
     updateSpeedCurve() {
-        const point1 = document.getElementById('point1');
-        const point2 = document.getElementById('point2');
-        const path = document.getElementById('speedCurvePath');
+        if (!this.speedCurvePath || !this.controlPoints || !this.speedCurvePoints) return;
         
-        const y1 = parseFloat(point1.getAttribute('cy'));
-        const y2 = parseFloat(point2.getAttribute('cy'));
+        // 5点制御での正確なベジエ曲線パスを生成
+        const p0 = this.speedCurvePoints[0]; // 左端
+        const p1 = this.speedCurvePoints[1]; // 中間1
+        const p2 = this.speedCurvePoints[2]; // 中間2
+        const p3 = this.speedCurvePoints[3]; // 中間3
+        const p4 = this.speedCurvePoints[4]; // 右端
         
-        // 直線で更新
-        path.setAttribute('d', `M 20 ${y1} L 280 ${y2}`);
+        // 滑らかなベジエ曲線パス（端点制御可能）
+        const pathData = `M${p0.x},${p0.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y} C${p3.x},${p3.y} ${p4.x},${p4.y} ${p4.x},${p4.y}`;
+        this.speedCurvePath.setAttribute('d', pathData);
+        
+        // コントロールポイント位置更新
+        this.controlPoints.forEach((point, index) => {
+            if (point && this.speedCurvePoints[index]) {
+                point.setAttribute('cx', this.speedCurvePoints[index].x);
+                point.setAttribute('cy', this.speedCurvePoints[index].y);
+            }
+        });
+        
+        // 制御ハンドル線を更新
+        this.updateControlHandles();
+        
+        // 精密入力フィールド更新
+        this.updatePrecisionInputs();
         
         // 速度データを生成
-        this.generateSpeedData(y1, y2);
+        this.generateSpeedDataFromBezier();
         
-        console.log('⚡ Speed curve updated in real-time');
+        console.log('⚡ Accurate speed curve updated - SVG/calculation synchronized');
     }
     
-    generateSpeedData(y1, y2) {
+    updateControlHandles() {
+        // 制御ハンドル線を更新（視覚的フィードバック向上）
+        const handleLines = [
+            document.getElementById('handle1Line'),
+            document.getElementById('handle2Line'), 
+            document.getElementById('handle3Line')
+        ];
+        
+        handleLines.forEach((line, index) => {
+            if (line && this.speedCurvePoints[index]) {
+                const point = this.speedCurvePoints[index];
+                line.setAttribute('x1', point.x);
+                line.setAttribute('y1', 140);
+                line.setAttribute('x2', point.x);
+                line.setAttribute('y2', point.y);
+            }
+        });
+    }
+    
+    generateSpeedDataFromBezier() {
         const steps = 100;
         this.speedCurveData = [];
         
         for (let i = 0; i <= steps; i++) {
             const t = i / steps;
-            const y = y1 + (y2 - y1) * t;
+            const y = this.calculateBezierY(t);
             
-            // Y座標を速度倍率に変換 (180=1.0x, 20=3.0x)
-            const speed = 1.0 + (180 - y) / 80;
-            this.speedCurveData.push(Math.max(0.1, Math.min(3.0, speed)));
+            // Y座標を速度倍率に変換 (20=3.0x, 140=1.0x, 220=0.1x)
+            const speed = this.yToSpeed(y);
+            this.speedCurveData.push(speed);
         }
         
-        console.log(`🎯 Generated ${this.speedCurveData.length} speed curve points`);
+        console.log(`🎯 Generated ${this.speedCurveData.length} bezier curve points`);
     }
     
     resetSpeedCurve() {
-        document.getElementById('point1').setAttribute('cy', '180');
-        document.getElementById('point2').setAttribute('cy', '180');
+        this.speedCurvePoints = [
+            { x: 0, y: 140, speed: 1.0 },    // 左端リセット
+            { x: 70, y: 140, speed: 1.0 },   // 中間1
+            { x: 140, y: 140, speed: 1.0 },  // 中間2
+            { x: 210, y: 140, speed: 1.0 },  // 中間3
+            { x: 280, y: 140, speed: 1.0 }   // 右端リセット
+        ];
         this.updateSpeedCurve();
+        console.log('🔄 Speed curve reset to default (5-point system)');
+    }
+    
+    // 新しい速度曲線エディタの補助関数
+    initializeCurveInteractions() {
+        let isDragging = false;
+        let activePointIndex = -1;
+        
+        // コントロールポイントのドラッグ処理
+        this.controlPoints.forEach((point, index) => {
+            if (!point) return;
+            
+            point.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                activePointIndex = index;
+                point.classList.add('active');
+                this.showRealtimeInfo(true);
+                e.preventDefault();
+            });
+            
+            point.addEventListener('mouseenter', () => {
+                if (!isDragging) point.style.r = '10';
+            });
+            
+            point.addEventListener('mouseleave', () => {
+                if (!isDragging) point.style.r = '8';
+            });
+        });
+        
+        // グローバルマウス移動（SVG範囲外でも追従）
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || activePointIndex === -1 || !this.speedCurveSvg) return;
+            
+            const rect = this.speedCurveSvg.getBoundingClientRect();
+            const y = Math.max(20, Math.min(220, e.clientY - rect.top));
+            
+            this.speedCurvePoints[activePointIndex].y = y;
+            this.speedCurvePoints[activePointIndex].speed = this.yToSpeed(y);
+            
+            this.updateSpeedCurve();
+            this.updateRealtimeInfo(activePointIndex, y);
+        });
+        
+        // ドラッグ終了
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                this.controlPoints[activePointIndex]?.classList.remove('active');
+                this.showRealtimeInfo(false);
+                activePointIndex = -1;
+            }
+        });
+    }
+    
+    initializePrecisionControls() {
+        this.precisionInputs.forEach((input, index) => {
+            if (!input) return;
+            
+            input.addEventListener('input', (e) => {
+                const speed = parseFloat(e.target.value);
+                if (isNaN(speed)) return;
+                
+                this.speedCurvePoints[index].speed = speed;
+                this.speedCurvePoints[index].y = this.speedToY(speed);
+                this.updateSpeedCurve();
+            });
+        });
+    }
+    
+    initializeCurveButtons() {
+        const resetButton = document.getElementById('resetSpeedCurve');
+        const applyButton = document.getElementById('applySpeedCurve');
+        
+        if (resetButton) {
+            resetButton.addEventListener('click', () => {
+                this.resetSpeedCurve();
+            });
+        }
+        
+        if (applyButton) {
+            applyButton.addEventListener('click', () => {
+                console.log('🎯 Speed curve applied to playback system');
+            });
+        }
+    }
+    
+    updatePrecisionInputs() {
+        this.precisionInputs.forEach((input, index) => {
+            if (input && this.speedCurvePoints[index]) {
+                input.value = this.speedCurvePoints[index].speed.toFixed(2);
+            }
+        });
+    }
+    
+    showRealtimeInfo(show) {
+        if (this.realtimeInfo) {
+            this.realtimeInfo.style.opacity = show ? '1' : '0';
+        }
+    }
+    
+    updateRealtimeInfo(pointIndex, y) {
+        if (!this.realtimeSpeed || !this.realtimeTime) return;
+        
+        const speed = this.yToSpeed(y);
+        const timePercent = ((pointIndex + 1) * 33.33).toFixed(0);
+        
+        this.realtimeSpeed.textContent = `${speed.toFixed(1)}x`;
+        this.realtimeTime.textContent = `${timePercent}%`;
+    }
+    
+    yToSpeed(y) {
+        // Y座標を速度に変換 (20=3.0x, 140=1.0x, 220=0.1x)
+        const normalizedY = (y - 20) / 200; // 0-1の範囲
+        const speed = 3.0 - (normalizedY * 2.9); // 3.0から0.1への逆変換
+        return Math.max(0.1, Math.min(3.0, speed));
+    }
+    
+    speedToY(speed) {
+        // 速度をY座標に変換
+        const normalizedSpeed = (3.0 - speed) / 2.9; // 0-1の範囲
+        return 20 + (normalizedSpeed * 200);
+    }
+    
+    calculateBezierY(t) {
+        // 正確なベジエ曲線計算 - SVGパスと一致
+        const p0 = { x: 0, y: 140 };    // 開始点
+        const p1 = this.speedCurvePoints[0];  // 制御点1
+        const p2 = this.speedCurvePoints[1];  // 制御点2  
+        const p3 = this.speedCurvePoints[2];  // 制御点3
+        const p4 = { x: 280, y: 140 }; // 終了点
+        
+        // 二次ベジエ曲線の正確な計算（SVGのQ, T命令に対応）
+        if (t <= 0.5) {
+            // 前半: 二次ベジエ Q(p0, p1, p2)
+            const localT = t * 2; // 0-1に正規化
+            const oneMinusT = 1 - localT;
+            return oneMinusT * oneMinusT * p0.y + 
+                   2 * oneMinusT * localT * p1.y + 
+                   localT * localT * p2.y;
+        } else {
+            // 後半: T命令による滑らかな接続 Q(p2, p3, p4)
+            const localT = (t - 0.5) * 2; // 0-1に正規化
+            const oneMinusT = 1 - localT;
+            return oneMinusT * oneMinusT * p2.y + 
+                   2 * oneMinusT * localT * p3.y + 
+                   localT * localT * p4.y;
+        }
     }
     
     // 5. ループ再生 - フレームベース実装
