@@ -158,33 +158,36 @@ body {
     background: linear-gradient(135deg, #2d2d2d 0%, #333 100%);
 }
 
-/* Canvas要素 */
-#previewCanvas {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    max-height: 400px;
-    object-fit: contain;
-    display: block;
-    background: linear-gradient(135deg, #000 0%, #111 100%);
-    border-radius: 8px;
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
-}
-
+/* Adobe Premiere Pro風プレビューパネル */
 .video-container {
     flex: 1;
     position: relative;
-    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
-    border-radius: 8px;
-    border: 1px solid #444;
-    overflow: visible;
+    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+    border: 2px solid #2a2a2a;
+    border-radius: 2px;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 300px;
-    padding: 15px;
-    margin-bottom: 15px;
+    min-height: 320px;
+    margin-bottom: 12px;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Canvas要素 - Premiere Pro風フレーミング */
+#previewCanvas {
+    width: auto;
+    max-width: calc(100% - 20px);
+    height: auto;
+    max-height: calc(100% - 20px);
+    object-fit: contain;
+    background: #000;
+    border: 1px solid #333;
+    box-shadow: 
+        0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 2px 10px rgba(0, 0, 0, 0.8);
+    border-radius: 1px;
 }
 
 .preview-overlay {
@@ -391,55 +394,64 @@ body {
     background-color: #106ebe;
 }
 
-/* タイムラインパネル */
+/* Adobe Premiere Pro風タイムラインパネル */
 .timeline-panel {
     height: 35vh;
-    border-top: 1px solid #3e3e3e;
-    background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
-    border-radius: 12px;
-    margin-top: 15px;
-    border: 1px solid #444;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+    border-top: 1px solid #2a2a2a;
+    border-radius: 0;
+    margin-top: 1px;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 -1px 3px rgba(0, 0, 0, 0.3);
 }
 
-/* シークバーとコントロール */
+/* Premiere Pro風シークバーとコントロール */
 .timeline-seekbar-container {
     display: flex;
     align-items: center;
-    margin: 15px;
-    padding: 12px;
-    background: #2a2a2a;
-    border-radius: 8px;
-    border: 1px solid #444;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, #2d2d2d 0%, #252525 100%);
+    border-bottom: 1px solid #1a1a1a;
+    border-top: 1px solid #3a3a3a;
+    margin: 0;
 }
 
 .playback-controls {
     display: flex;
-    gap: 8px;
-    margin-right: 15px;
+    gap: 2px;
+    margin-right: 12px;
+    padding: 2px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
 }
 
+/* Premiere Pro風再生コントロール */
 .control-btn {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 14px;
+    background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
+    color: #e0e0e0;
+    border: 1px solid #444;
+    border-radius: 2px;
+    padding: 6px 10px;
+    font-size: 12px;
     cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 40px;
+    transition: all 0.15s ease;
+    min-width: 32px;
     font-family: inherit;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .control-btn:hover {
-    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    background: linear-gradient(180deg, #444 0%, #333 100%);
+    border-color: #555;
+    color: white;
 }
 
 .control-btn:active {
-    transform: translateY(0);
+    background: linear-gradient(180deg, #2a2a2a 0%, #333 100%);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .seekbar-container {
@@ -488,13 +500,17 @@ body {
     text-align: center;
 }
 
-/* タイムライン定規 */
+/* Premiere Pro風タイムライン定規 */
 .timeline-ruler {
-    height: 25px;
-    background: linear-gradient(135deg, #2a2a2a 0%, #333 100%);
-    border-bottom: 1px solid #555;
+    height: 24px;
+    background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
+    border-bottom: 1px solid #1a1a1a;
+    border-top: 1px solid #3a3a3a;
     position: relative;
-    margin: 0 15px;
+    margin: 0;
+    font-size: 10px;
+    color: #aaa;
+    overflow: hidden;
 }
 
 .ruler-markers {
@@ -503,11 +519,25 @@ body {
     height: 100%;
     background-image: repeating-linear-gradient(
         90deg,
-        transparent,
-        transparent 49px,
-        #666 49px,
-        #666 51px
+        transparent 0px,
+        transparent 48px,
+        rgba(170, 170, 170, 0.3) 48px,
+        rgba(170, 170, 170, 0.3) 50px,
+        transparent 50px,
+        transparent 98px,
+        rgba(170, 170, 170, 0.6) 98px,
+        rgba(170, 170, 170, 0.6) 100px
     );
+}
+
+/* ルーラーの時間表示 */
+.ruler-time-marker {
+    position: absolute;
+    top: 2px;
+    font-size: 9px;
+    color: #aaa;
+    font-family: 'Consolas', 'Courier New', monospace;
+    pointer-events: none;
 }
 
 /* プレイヘッド */
@@ -531,14 +561,37 @@ body {
     overflow-y: auto;
 }
 
+/* Premiere Pro風トラックエリア */
 .timeline-track {
     flex: 1;
-    background-color: #1a1a1a;
-    margin: 12px;
-    border-radius: 4px;
+    background: repeating-linear-gradient(
+        180deg,
+        #1a1a1a 0px,
+        #1a1a1a 58px,
+        #151515 58px,
+        #151515 60px
+    );
     position: relative;
     overflow-x: auto;
     overflow-y: hidden;
+    border-left: 4px solid #2a2a2a;
+    margin: 0;
+}
+
+/* トラック分離線 */
+.track-separator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(42, 42, 42, 0.5) 20%, 
+        rgba(42, 42, 42, 0.8) 50%, 
+        rgba(42, 42, 42, 0.5) 80%, 
+        transparent 100%
+    );
+    top: 60px;
 }
 
 .timeline-placeholder {
@@ -553,10 +606,14 @@ body {
     font-size: 14px;
 }
 
+/* Premiere Pro風タイムラインコントロール */
 .timeline-controls {
-    padding: 8px 12px;
-    background-color: #333;
-    border-top: 1px solid #3e3e3e;
+    padding: 6px 12px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #222 100%);
+    border-top: 1px solid #3a3a3a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .timeline-info {
@@ -565,22 +622,28 @@ body {
     font-family: 'Courier New', monospace;
 }
 
-/* タイムラインクリップ */
+/* Premiere Pro風タイムラインクリップ */
 .timeline-clip {
-    height: 60px;
-    background: linear-gradient(135deg, #0078d4, #106ebe);
-    border: 1px solid #0078d4;
-    border-radius: 4px;
+    height: 44px;
+    background: linear-gradient(180deg, #4a90e2 0%, #357abd 50%, #2e69a3 100%);
+    border: 1px solid #2e69a3;
+    border-radius: 1px;
     position: absolute;
-    top: 20px;
+    top: 8px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     cursor: grab;
     color: white;
-    font-size: 12px;
-    font-weight: 600;
-    min-width: 80px;
+    font-size: 11px;
+    font-weight: 500;
+    min-width: 60px;
+    padding: 0 6px;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 1px 3px rgba(0, 0, 0, 0.3);
+    font-family: 'Segoe UI', sans-serif;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
 }
 
 .timeline-clip:active {
@@ -588,8 +651,30 @@ body {
 }
 
 .timeline-clip.selected {
-    border-color: #fff;
-    box-shadow: 0 0 0 2px #0078d4;
+    border-color: #ffa500;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 0 0 1px #ffa500,
+        0 1px 3px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(180deg, #ff8c42 0%, #e67e22 50%, #d35400 100%);
+}
+
+/* クリップ名表示 */
+.timeline-clip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 12px);
+}
+
+/* クリップのループ表示 */
+.timeline-clip-loop-indicator {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Consolas', monospace;
 }
 
 /* レスポンシブ調整 */
