@@ -33,6 +33,7 @@ class LOOOOPApp {
         this.initializeElements();
         this.setupEventListeners();
         this.setupSpeedCurveEditor();
+        this.setupSpeedCurveEditorWide();
         this.initializeNewSpeedSystem();
         console.log('🚀 LOOOOP App initialized with speed curve editor');
     }
@@ -360,8 +361,11 @@ class LOOOOPApp {
         }, 0);
         
         // UI更新
-        document.getElementById('totalFrames').textContent = this.totalFrames;
-        document.getElementById('totalLoops').textContent = this.timelineClips.length;
+        const totalFramesEl = document.getElementById('totalFrames');
+        const totalLoopsEl = document.getElementById('totalLoops');
+        
+        if (totalFramesEl) totalFramesEl.textContent = this.totalFrames;
+        if (totalLoopsEl) totalLoopsEl.textContent = this.timelineClips.length;
         
         console.log(`📊 Total frames: ${this.totalFrames} (${this.timelineClips.length} clips)`);
     }
@@ -585,6 +589,53 @@ class LOOOOPApp {
         this.updateSpeedCurve();
         
         console.log('✅ Rich speed curve editor successfully initialized!');
+    }
+    
+    // ワイド版速度曲線エディタの初期化
+    setupSpeedCurveEditorWide() {
+        console.log('🎨 Initializing wide speed curve editor...');
+        
+        // ワイド版DOM要素の取得
+        this.speedCurveSvgWide = document.getElementById('speedCurveSvgWide');
+        this.speedCurvePathWide = document.getElementById('speedCurvePathWide');
+        this.controlPointsWide = [
+            document.getElementById('controlPoint0Wide'),
+            document.getElementById('controlPoint1Wide'),
+            document.getElementById('controlPoint2Wide'),
+            document.getElementById('controlPoint3Wide'),
+            document.getElementById('controlPoint4Wide')
+        ];
+        
+        // ワイド版精密制御入力フィールド
+        this.precisionInputsWide = [
+            document.getElementById('p0SpeedWide'),
+            document.getElementById('p1SpeedWide'),
+            document.getElementById('p2SpeedWide'),
+            document.getElementById('p3SpeedWide'),
+            document.getElementById('p4SpeedWide')
+        ];
+        
+        // 存在確認
+        if (!this.speedCurveSvgWide || !this.speedCurvePathWide) {
+            console.error('❌ Wide speed curve elements not found!');
+            return;
+        }
+        
+        // ワイド版速度曲線データの初期化（Y座標を160pxスケールに調整）
+        this.speedCurvePointsWide = [
+            { x: 0, y: 80, speed: 1.0 },
+            { x: 70, y: 80, speed: 1.0 },
+            { x: 140, y: 80, speed: 1.0 },
+            { x: 210, y: 80, speed: 1.0 },
+            { x: 280, y: 80, speed: 1.0 }
+        ];
+        
+        this.initializeCurveInteractionsWide();
+        this.initializePrecisionControlsWide();
+        this.initializeCurveButtonsWide();
+        this.updateSpeedCurveWide();
+        
+        console.log('✅ Wide speed curve editor initialized!');
     }
     
     updateSpeedCurve() {
@@ -893,6 +944,10 @@ class LOOOOPApp {
             });
             this.updateFrameInfo();
             
+            // タイムラインインジケーターも更新
+            const currentProgress = this.currentFrame / (this.totalFrames - 1);
+            this.updateSpeedCurveTimelineIndicator(currentProgress);
+            
             this.lastFrameTime = now;
         }
         
@@ -1068,13 +1123,24 @@ class LOOOOPApp {
     updateFrameInfo() {
         const segmentInfo = this.getSegmentInfoForFrame(this.currentFrame);
         
-        document.getElementById('currentFrame').textContent = this.currentFrame;
-        document.getElementById('currentLoop').textContent = segmentInfo.loopIndex + 1;
+        const currentFrameEl = document.getElementById('currentFrame');
+        const currentLoopEl = document.getElementById('currentLoop');
+        
+        if (currentFrameEl) currentFrameEl.textContent = this.currentFrame;
+        
+        if (currentLoopEl && segmentInfo) {
+            currentLoopEl.textContent = segmentInfo.loopIndex + 1;
+        } else if (currentLoopEl) {
+            currentLoopEl.textContent = '0';
+        }
         
         // シークバー更新
         const progress = this.currentFrame / this.totalFrames;
-        document.getElementById('seekbarProgress').style.width = `${progress * 100}%`;
-        document.getElementById('seekbarThumb').style.left = `${progress * 100}%`;
+        const seekbarProgress = document.getElementById('seekbarProgress');
+        const seekbarThumb = document.getElementById('seekbarThumb');
+        
+        if (seekbarProgress) seekbarProgress.style.width = `${progress * 100}%`;
+        if (seekbarThumb) seekbarThumb.style.left = `${progress * 100}%`;
         
         // タイムラインシークバー更新
         const timelineSeekbar = document.getElementById('timelineSeekbar');
@@ -1089,8 +1155,12 @@ class LOOOOPApp {
         // 時間表示 + 現在の速度表示
         const currentSeconds = (this.currentFrame / 30);
         const totalSeconds = (this.totalFrames / 30);
-        document.getElementById('timeDisplay').textContent = 
-            `${this.formatTime(currentSeconds)} / ${this.formatTime(totalSeconds)} (${this.currentSpeed.toFixed(1)}x)`;
+        
+        const currentTimeEl = document.getElementById('currentTimeDisplay');
+        const totalTimeEl = document.getElementById('totalTimeDisplay');
+        
+        if (currentTimeEl) currentTimeEl.textContent = this.formatTime(currentSeconds);
+        if (totalTimeEl) totalTimeEl.textContent = this.formatTime(totalSeconds);
     }
     
     formatTime(seconds) {
@@ -1154,6 +1224,7 @@ class LOOOOPApp {
             this.updateFrameInfo();
             this.updatePlayhead();
             this.updateTimeDisplay();
+            this.updateSpeedCurveTimelineIndicator(progress);
             
             console.log(`🎯 Timeline seeked to frame: ${this.currentFrame}/${this.totalFrames}`);
         });
@@ -1167,7 +1238,73 @@ class LOOOOPApp {
             this.updateFrameInfo();
             this.updatePlayhead();
             this.updateTimeDisplay();
+            this.updateSpeedCurveTimelineIndicator(progress);
         });
+    }
+    
+    // 速度曲線エディタのタイムラインインジケーター更新
+    updateSpeedCurveTimelineIndicator(progress) {
+        const speedCurveSvgWide = document.getElementById('speedCurveSvgWide');
+        if (!speedCurveSvgWide) return;
+        
+        // 既存のインジケーターを削除
+        const existingIndicator = speedCurveSvgWide.querySelector('#timelineIndicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        // 新しいインジケーターを作成
+        const svgRect = speedCurveSvgWide.getBoundingClientRect();
+        const indicatorX = progress * 280; // SVG幅の280pxに対応
+        
+        const indicatorLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        indicatorLine.setAttribute('id', 'timelineIndicator');
+        indicatorLine.setAttribute('x1', indicatorX);
+        indicatorLine.setAttribute('y1', '0');
+        indicatorLine.setAttribute('x2', indicatorX);
+        indicatorLine.setAttribute('y2', '160');
+        indicatorLine.setAttribute('stroke', '#ffff00');
+        indicatorLine.setAttribute('stroke-width', '2');
+        indicatorLine.setAttribute('stroke-dasharray', '4,2');
+        indicatorLine.setAttribute('opacity', '0.8');
+        
+        speedCurveSvgWide.appendChild(indicatorLine);
+        
+        // 現在の速度値を表示
+        const currentSpeed = this.getSpeedAtProgress(progress);
+        const speedLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        speedLabel.setAttribute('id', 'currentSpeedLabel');
+        speedLabel.setAttribute('x', Math.min(indicatorX + 5, 240));
+        speedLabel.setAttribute('y', '15');
+        speedLabel.setAttribute('fill', '#ffff00');
+        speedLabel.setAttribute('font-size', '11');
+        speedLabel.setAttribute('font-family', 'Consolas');
+        speedLabel.setAttribute('font-weight', 'bold');
+        speedLabel.textContent = `${currentSpeed.toFixed(1)}x`;
+        
+        speedCurveSvgWide.appendChild(speedLabel);
+    }
+    
+    // 進行位置での速度値を取得
+    getSpeedAtProgress(progress) {
+        if (!this.speedCurvePointsWide || this.speedCurvePointsWide.length < 5) {
+            return 1.0;
+        }
+        
+        const x = progress * 280; // SVG幅に対応
+        
+        // 5点の制御点から補間
+        for (let i = 0; i < this.speedCurvePointsWide.length - 1; i++) {
+            const p1 = this.speedCurvePointsWide[i];
+            const p2 = this.speedCurvePointsWide[i + 1];
+            
+            if (x >= p1.x && x <= p2.x) {
+                const ratio = (x - p1.x) / (p2.x - p1.x);
+                return p1.speed + (p2.speed - p1.speed) * ratio;
+            }
+        }
+        
+        return 1.0;
     }
     
     updatePlayhead() {
@@ -1496,6 +1633,218 @@ class LOOOOPApp {
         ctx.fillText('3.0x', 5, 12);
         ctx.fillText('2.0x', 5, height/2);
         ctx.fillText('1.0x', 5, height - 5);
+    }
+    
+    // ワイド版専用関数群
+    updateSpeedCurveWide() {
+        if (!this.speedCurvePathWide || !this.controlPointsWide || !this.speedCurvePointsWide) return;
+        
+        // ワイド版ベジエ曲線パスを生成
+        const p0 = this.speedCurvePointsWide[0];
+        const p1 = this.speedCurvePointsWide[1];
+        const p2 = this.speedCurvePointsWide[2];
+        const p3 = this.speedCurvePointsWide[3];
+        const p4 = this.speedCurvePointsWide[4];
+        
+        const pathData = `M${p0.x},${p0.y} Q${p1.x},${p1.y} ${p2.x},${p2.y} T${p3.x},${p3.y} L${p4.x},${p4.y}`;
+        this.speedCurvePathWide.setAttribute('d', pathData);
+        
+        // コントロールポイント位置更新
+        this.controlPointsWide.forEach((point, index) => {
+            if (point && this.speedCurvePointsWide[index]) {
+                point.setAttribute('cx', this.speedCurvePointsWide[index].x);
+                point.setAttribute('cy', this.speedCurvePointsWide[index].y);
+            }
+        });
+        
+        this.updateControlHandlesWide();
+        this.updatePrecisionInputsWide();
+        
+        // メイン速度曲線データに同期（動画編集との連動）
+        this.syncMainSpeedCurve();
+        
+        console.log('⚡ Wide speed curve updated and synced to main playback');
+    }
+    
+    updateControlHandlesWide() {
+        const handleLines = [
+            document.getElementById('handle0LineWide'),
+            document.getElementById('handle1LineWide'), 
+            document.getElementById('handle2LineWide'),
+            document.getElementById('handle3LineWide'),
+            document.getElementById('handle4LineWide')
+        ];
+        
+        handleLines.forEach((line, index) => {
+            if (line && this.speedCurvePointsWide[index]) {
+                const point = this.speedCurvePointsWide[index];
+                line.setAttribute('x1', point.x);
+                line.setAttribute('y1', 80);
+                line.setAttribute('x2', point.x);
+                line.setAttribute('y2', point.y);
+            }
+        });
+    }
+    
+    updatePrecisionInputsWide() {
+        this.precisionInputsWide.forEach((input, index) => {
+            if (input && this.speedCurvePointsWide[index]) {
+                input.value = this.speedCurvePointsWide[index].speed.toFixed(2);
+            }
+        });
+    }
+    
+    yToSpeedWide(y) {
+        // ワイド版Y座標を速度に変換（160px高さスケール）
+        const normalizedY = (y - 10) / 140; // 0-1の範囲
+        const speed = 4.0 - (normalizedY * 3.9);
+        return Math.max(0.1, Math.min(4.0, speed));
+    }
+    
+    speedToYWide(speed) {
+        // ワイド版速度をY座標に変換
+        const normalizedSpeed = (4.0 - speed) / 3.9;
+        return 10 + (normalizedSpeed * 140);
+    }
+    
+    syncMainSpeedCurve() {
+        // ワイド版の変更をメイン速度曲線に同期
+        if (!this.speedCurvePointsWide) return;
+        
+        // ワイド版から速度データを生成
+        const steps = 100;
+        this.speedCurveData = [];
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const y = this.calculateBezierYWide(t);
+            const speed = this.yToSpeedWide(y);
+            this.speedCurveData.push(speed);
+        }
+        
+        console.log('🔄 Main speed curve synced from wide editor');
+    }
+    
+    calculateBezierYWide(t) {
+        // ワイド版用ベジエ計算
+        const p0 = this.speedCurvePointsWide[0];
+        const p1 = this.speedCurvePointsWide[1];
+        const p2 = this.speedCurvePointsWide[2];
+        const p3 = this.speedCurvePointsWide[3];
+        const p4 = this.speedCurvePointsWide[4];
+        
+        if (t <= 0.5) {
+            const localT = t * 2;
+            const oneMinusT = 1 - localT;
+            return oneMinusT * oneMinusT * p0.y + 
+                   2 * oneMinusT * localT * p1.y + 
+                   localT * localT * p2.y;
+        } else {
+            const localT = (t - 0.5) * 2;
+            const oneMinusT = 1 - localT;
+            return oneMinusT * oneMinusT * p2.y + 
+                   2 * oneMinusT * localT * p3.y + 
+                   localT * localT * p4.y;
+        }
+    }
+    
+    initializeCurveInteractionsWide() {
+        let isDragging = false;
+        let activePointIndex = -1;
+        
+        this.controlPointsWide.forEach((point, index) => {
+            if (!point) return;
+            
+            point.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                activePointIndex = index;
+                point.classList.add('active');
+                document.body.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+            
+            point.addEventListener('mouseenter', () => {
+                if (!isDragging) {
+                    point.setAttribute('r', '8');
+                    document.body.style.cursor = 'grab';
+                }
+            });
+            
+            point.addEventListener('mouseleave', () => {
+                if (!isDragging) {
+                    point.setAttribute('r', '6');
+                    document.body.style.cursor = 'default';
+                }
+            });
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || activePointIndex === -1 || !this.speedCurveSvgWide) return;
+            
+            const rect = this.speedCurveSvgWide.getBoundingClientRect();
+            const y = Math.max(10, Math.min(150, e.clientY - rect.top));
+            
+            this.speedCurvePointsWide[activePointIndex].y = y;
+            this.speedCurvePointsWide[activePointIndex].speed = this.yToSpeedWide(y);
+            
+            this.updateSpeedCurveWide();
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                if (this.controlPointsWide[activePointIndex]) {
+                    this.controlPointsWide[activePointIndex].classList.remove('active');
+                    this.controlPointsWide[activePointIndex].setAttribute('r', '6');
+                }
+                document.body.style.cursor = 'default';
+                activePointIndex = -1;
+            }
+        });
+    }
+    
+    initializePrecisionControlsWide() {
+        this.precisionInputsWide.forEach((input, index) => {
+            if (!input) return;
+            
+            input.addEventListener('input', (e) => {
+                const speed = parseFloat(e.target.value);
+                if (isNaN(speed)) return;
+                
+                this.speedCurvePointsWide[index].speed = speed;
+                this.speedCurvePointsWide[index].y = this.speedToYWide(speed);
+                this.updateSpeedCurveWide();
+            });
+        });
+    }
+    
+    initializeCurveButtonsWide() {
+        const resetButton = document.getElementById('resetSpeedCurveWide');
+        const applyButton = document.getElementById('applySpeedCurveWide');
+        
+        if (resetButton) {
+            resetButton.addEventListener('click', () => {
+                this.resetSpeedCurveWide();
+            });
+        }
+        
+        if (applyButton) {
+            applyButton.addEventListener('click', () => {
+                console.log('🎯 Wide speed curve applied to playback system');
+            });
+        }
+    }
+    
+    resetSpeedCurveWide() {
+        this.speedCurvePointsWide = [
+            { x: 0, y: 80, speed: 1.0 },
+            { x: 70, y: 80, speed: 1.0 },
+            { x: 140, y: 80, speed: 1.0 },
+            { x: 210, y: 80, speed: 1.0 },
+            { x: 280, y: 80, speed: 1.0 }
+        ];
+        this.updateSpeedCurveWide();
+        console.log('🔄 Wide speed curve reset to default');
     }
 }
 

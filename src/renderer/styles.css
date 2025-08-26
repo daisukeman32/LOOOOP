@@ -20,24 +20,24 @@ body {
     flex-direction: column;
 }
 
-/* メインレイアウト */
+/* メインレイアウト - 2カラム（インスペクター削除） */
 .main-layout {
     display: grid;
-    grid-template-columns: 220px 1fr 300px;
+    grid-template-columns: 220px 1fr;
     gap: 1px;
     height: 70vh;
     background-color: #3e3e3e;
 }
 
 /* パネル共通スタイル */
-.media-pool, .preview-panel, .inspector, .timeline-panel {
+.media-pool, .preview-panel, .timeline-panel {
     background-color: #2d2d2d;
     border: 1px solid #3e3e3e;
     display: flex;
     flex-direction: column;
 }
 
-.media-pool h3, .preview-panel h3, .inspector h3, .timeline-panel h3 {
+.media-pool h3, .preview-panel h3, .timeline-panel h3 {
     background-color: #333333;
     padding: 8px 12px;
     margin: 0;
@@ -54,6 +54,40 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+/* ループ回数セクション */
+.loop-count-section {
+    background-color: #333;
+    border: 1px solid #3e3e3e;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.loop-count-section label {
+    color: #ccc;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.loop-count-section input {
+    background-color: #444;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    padding: 6px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    width: 60px;
+}
+
+.loop-count-section input:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
 }
 
 .import-area {

@@ -23,6 +23,13 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- ループ回数設定 -->
+                <div class="loop-count-section">
+                    <label>ループ回数:</label>
+                    <input type="number" id="loopCount" min="1" max="99" value="3">
+                    <button class="set-button" id="setToTimeline">セット</button>
+                </div>
             </div>
 
             <!-- 中央: プレビューパネル -->
@@ -182,154 +189,6 @@
                 </div>
             </div>
 
-            <!-- 右側: インスペクター -->
-            <div class="inspector">
-                <h3>インスペクター</h3>
-                <div class="inspector-content" id="inspector">
-                    <div class="inspector-section">
-                        <label>ループ回数:</label>
-                        <input type="number" id="loopCount" min="1" max="99" value="3">
-                        <button class="set-button" id="setToTimeline">セット</button>
-                    </div>
-                    
-                    <div class="inspector-section">
-                        <label>速度曲線:</label>
-                        <div class="speed-curve-editor-rich">
-                            <svg id="speedCurveSvg" width="280" height="240">
-                                <defs>
-                                    <!-- 高精度グリッド -->
-                                    <pattern id="fineGrid" width="10" height="10" patternUnits="userSpaceOnUse">
-                                        <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#252525" stroke-width="0.5"/>
-                                    </pattern>
-                                    <pattern id="majorGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#404040" stroke-width="1"/>
-                                    </pattern>
-                                    <!-- グラデーション -->
-                                    <linearGradient id="speedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                                        <stop offset="0%" style="stop-color:#ff4444;stop-opacity:0.15" />
-                                        <stop offset="25%" style="stop-color:#ffaa44;stop-opacity:0.1" />
-                                        <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.05" />
-                                        <stop offset="75%" style="stop-color:#44ffaa;stop-opacity:0.1" />
-                                        <stop offset="100%" style="stop-color:#44ff44;stop-opacity:0.15" />
-                                    </linearGradient>
-                                    <!-- 影効果 -->
-                                    <filter id="glow">
-                                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                                        <feMerge> 
-                                            <feMergeNode in="coloredBlur"/>
-                                            <feMergeNode in="SourceGraphic"/> 
-                                        </feMerge>
-                                    </filter>
-                                </defs>
-                                
-                                <!-- 背景グラデーション -->
-                                <rect width="100%" height="100%" fill="url(#speedGradient)" />
-                                
-                                <!-- グリッドレイヤー -->
-                                <rect width="100%" height="100%" fill="url(#fineGrid)" />
-                                <rect width="100%" height="100%" fill="url(#majorGrid)" />
-                                
-                                <!-- 速度ゾーンラベル -->
-                                <g id="speedLabels">
-                                    <text x="8" y="20" fill="#ff4444" font-size="10" font-family="Consolas" font-weight="bold">4.0x</text>
-                                    <text x="8" y="50" fill="#ff6666" font-size="10" font-family="Consolas">3.0x</text>
-                                    <text x="8" y="80" fill="#ffaa66" font-size="10" font-family="Consolas">2.0x</text>
-                                    <text x="8" y="110" fill="#ffffff" font-size="10" font-family="Consolas">1.5x</text>
-                                    <text x="8" y="140" fill="#ffffff" font-size="11" font-family="Consolas" font-weight="bold">1.0x</text>
-                                    <text x="8" y="170" fill="#aaffaa" font-size="10" font-family="Consolas">0.5x</text>
-                                    <text x="8" y="200" fill="#aaff66" font-size="10" font-family="Consolas">0.2x</text>
-                                    <text x="8" y="220" fill="#66ff66" font-size="10" font-family="Consolas">0.1x</text>
-                                </g>
-                                
-                                <!-- タイムラベル -->
-                                <g id="timeLabels">
-                                    <text x="40" y="235" fill="#ccc" font-size="9" font-family="Consolas">25%</text>
-                                    <text x="100" y="235" fill="#ccc" font-size="9" font-family="Consolas">50%</text>
-                                    <text x="160" y="235" fill="#ccc" font-size="9" font-family="Consolas">75%</text>
-                                    <text x="240" y="235" fill="#ccc" font-size="9" font-family="Consolas">100%</text>
-                                </g>
-                                
-                                <!-- 中心基準線 -->
-                                <line x1="0" y1="140" x2="280" y2="140" stroke="#666" stroke-width="2" stroke-dasharray="8,4" opacity="0.8" />
-                                
-                                <!-- ベジエ曲線 -->
-                                <path id="speedCurvePath" d="M0,140 C70,140 70,140 140,140 S210,140 280,140" 
-                                      fill="none" stroke="#4CAF50" stroke-width="4" filter="url(#glow)" />
-                                
-                                <!-- 制御ハンドル線 -->
-                                <g id="controlHandles" opacity="0.6">
-                                    <line id="handle1Line" x1="70" y1="140" x2="70" y2="140" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                    <line id="handle2Line" x1="140" y1="140" x2="140" y2="140" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                    <line id="handle3Line" x1="210" y1="140" x2="210" y2="140" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                </g>
-                                
-                                <!-- 全コントロールポイント（5点制御） -->
-                                <g id="controlPoints">
-                                    <!-- 左端ポイント（開始点） -->
-                                    <circle id="controlPoint0" cx="0" cy="140" r="8" fill="#ff6b6b" stroke="#ffffff" stroke-width="2" cursor="move" 
-                                            class="control-point endpoint" data-speed="1.0" />
-                                    <!-- 中間制御ポイント -->
-                                    <circle id="controlPoint1" cx="70" cy="140" r="8" fill="#ffffff" stroke="#4CAF50" stroke-width="3" cursor="move" 
-                                            class="control-point" data-speed="1.0" />
-                                    <circle id="controlPoint2" cx="140" cy="140" r="8" fill="#ffffff" stroke="#4CAF50" stroke-width="3" cursor="move" 
-                                            class="control-point" data-speed="1.0" />
-                                    <circle id="controlPoint3" cx="210" cy="140" r="8" fill="#ffffff" stroke="#4CAF50" stroke-width="3" cursor="move" 
-                                            class="control-point" data-speed="1.0" />
-                                    <!-- 右端ポイント（終了点） -->
-                                    <circle id="controlPoint4" cx="280" cy="140" r="8" fill="#ff6b6b" stroke="#ffffff" stroke-width="2" cursor="move" 
-                                            class="control-point endpoint" data-speed="1.0" />
-                                </g>
-                                
-                                <!-- リアルタイム情報表示 -->
-                                <g id="realtimeInfo" opacity="0" pointer-events="none">
-                                    <rect x="200" y="10" width="70" height="40" rx="4" fill="rgba(0,0,0,0.8)" />
-                                    <text id="realtimeSpeed" x="210" y="25" fill="#4CAF50" font-size="11" font-family="Consolas">1.0x</text>
-                                    <text id="realtimeTime" x="210" y="40" fill="#ccc" font-size="9" font-family="Consolas">50%</text>
-                                </g>
-                            </svg>
-                            
-                            <!-- 精密制御パネル -->
-                            <div class="curve-precision-panel">
-                                <div class="precision-info">
-                                    <span class="precision-label">精密制御:</span>
-                                    <div class="precision-values">
-                                        <div class="value-item">
-                                            <label>P0:</label>
-                                            <input type="number" id="p0Speed" min="0.1" max="4.0" step="0.05" value="1.0">
-                                            <span>x</span>
-                                        </div>
-                                        <div class="value-item">
-                                            <label>P1:</label>
-                                            <input type="number" id="p1Speed" min="0.1" max="4.0" step="0.05" value="1.0">
-                                            <span>x</span>
-                                        </div>
-                                        <div class="value-item">
-                                            <label>P2:</label>
-                                            <input type="number" id="p2Speed" min="0.1" max="4.0" step="0.05" value="1.0">
-                                            <span>x</span>
-                                        </div>
-                                        <div class="value-item">
-                                            <label>P3:</label>
-                                            <input type="number" id="p3Speed" min="0.1" max="4.0" step="0.05" value="1.0">
-                                            <span>x</span>
-                                        </div>
-                                        <div class="value-item">
-                                            <label>P4:</label>
-                                            <input type="number" id="p4Speed" min="0.1" max="4.0" step="0.05" value="1.0">
-                                            <span>x</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="speed-curve-controls">
-                            <button class="reset-button" id="resetSpeedCurve">曲線リセット</button>
-                            <button class="apply-button" id="applySpeedCurve">速度曲線適用</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- 下部: タイムライン -->
