@@ -1,0 +1,509 @@
+/* LOOOOP スタイルシート - ダークテーマ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #1e1e1e;
+    color: #ffffff;
+    overflow: hidden;
+    user-select: none;
+}
+
+#app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* メインレイアウト */
+.main-layout {
+    display: grid;
+    grid-template-columns: 250px 1fr 300px;
+    gap: 1px;
+    height: 70vh;
+    background-color: #3e3e3e;
+}
+
+/* パネル共通スタイル */
+.media-pool, .preview-panel, .inspector, .timeline-panel {
+    background-color: #2d2d2d;
+    border: 1px solid #3e3e3e;
+    display: flex;
+    flex-direction: column;
+}
+
+.media-pool h3, .preview-panel h3, .inspector h3, .timeline-panel h3 {
+    background-color: #333333;
+    padding: 8px 12px;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #3e3e3e;
+}
+
+/* メディアプール */
+.media-pool-content {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+}
+
+.import-area {
+    height: 100%;
+    border: 2px dashed #555;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.3s ease;
+}
+
+.import-area.drag-over {
+    border-color: #0078d4;
+    background-color: #0078d420;
+}
+
+.import-placeholder {
+    text-align: center;
+}
+
+.import-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.import-placeholder p {
+    margin: 12px 0;
+    color: #cccccc;
+    font-size: 14px;
+}
+
+.import-button {
+    background-color: #0078d4;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.import-button:hover {
+    background-color: #106ebe;
+}
+
+/* メディアクリップ */
+.media-clip {
+    width: 100%;
+    height: 120px;
+    background-color: #3e3e3e;
+    border: 1px solid #555;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    position: relative;
+    cursor: grab;
+    overflow: hidden;
+}
+
+.media-clip:active {
+    cursor: grabbing;
+}
+
+.media-clip img {
+    width: 100%;
+    height: 80%;
+    object-fit: cover;
+}
+
+.media-clip .clip-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 8px;
+    background-color: rgba(0, 0, 0, 0.8);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* プレビューパネル */
+.preview-content {
+    flex: 1;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.video-container {
+    flex: 1;
+    position: relative;
+    background-color: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#previewVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.preview-placeholder {
+    text-align: center;
+}
+
+.preview-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 0 0;
+}
+
+.control-btn {
+    background-color: #3e3e3e;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.control-btn:hover {
+    background-color: #4e4e4e;
+}
+
+.control-btn:active {
+    background-color: #0078d4;
+}
+
+.time-display {
+    margin-left: auto;
+    font-size: 14px;
+    color: #cccccc;
+    font-family: 'Courier New', monospace;
+}
+
+/* インスペクター */
+.inspector-content {
+    flex: 1;
+    padding: 12px;
+}
+
+.inspector-section {
+    margin-bottom: 20px;
+}
+
+.inspector-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.inspector-section input, .inspector-section select {
+    width: 100%;
+    padding: 6px 8px;
+    background-color: #3e3e3e;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.inspector-section input:focus, .inspector-section select:focus {
+    outline: none;
+    border-color: #0078d4;
+}
+
+/* 速度曲線エディタ */
+.speed-curve-editor {
+    width: 100%;
+    height: 200px;
+    background-color: #000;
+    border: 1px solid #555;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+#speedCurveSvg {
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+}
+
+.reset-button {
+    width: 100%;
+    background-color: #666;
+    color: white;
+    border: none;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s ease;
+}
+
+.reset-button:hover {
+    background-color: #777;
+}
+
+/* タイムラインパネル */
+.timeline-panel {
+    height: 30vh;
+    border-top: 1px solid #3e3e3e;
+}
+
+.timeline-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.timeline-track {
+    flex: 1;
+    background-color: #1a1a1a;
+    margin: 12px;
+    border-radius: 4px;
+    position: relative;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.timeline-placeholder {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timeline-placeholder p {
+    color: #888;
+    font-size: 14px;
+}
+
+.timeline-controls {
+    padding: 8px 12px;
+    background-color: #333;
+    border-top: 1px solid #3e3e3e;
+}
+
+.timeline-info {
+    font-size: 12px;
+    color: #ccc;
+    font-family: 'Courier New', monospace;
+}
+
+/* タイムラインクリップ */
+.timeline-clip {
+    height: 60px;
+    background: linear-gradient(135deg, #0078d4, #106ebe);
+    border: 1px solid #0078d4;
+    border-radius: 4px;
+    position: absolute;
+    top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.timeline-clip:active {
+    cursor: grabbing;
+}
+
+.timeline-clip.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px #0078d4;
+}
+
+/* モーダル */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #2d2d2d;
+    border: 1px solid #3e3e3e;
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+    color: #fff;
+    font-size: 18px;
+}
+
+.export-settings, .help-content {
+    margin-bottom: 20px;
+}
+
+.setting-group {
+    margin-bottom: 16px;
+}
+
+.setting-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+    color: #ccc;
+}
+
+.setting-group input, .setting-group select {
+    width: 100%;
+    padding: 8px;
+    background-color: #3e3e3e;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+.progress-section {
+    margin: 20px 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #3e3e3e;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0078d4, #106ebe);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#progressText {
+    font-size: 14px;
+    color: #ccc;
+    text-align: center;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.modal-buttons button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.cancel-button, .close-button {
+    background-color: #666;
+    color: white;
+}
+
+.cancel-button:hover, .close-button:hover {
+    background-color: #777;
+}
+
+.export-button {
+    background-color: #0078d4;
+    color: white;
+}
+
+.export-button:hover {
+    background-color: #106ebe;
+}
+
+/* ヘルプコンテンツ */
+.help-content h3 {
+    color: #0078d4;
+    margin: 16px 0 8px 0;
+    font-size: 16px;
+}
+
+.help-content ol, .help-content ul {
+    margin-left: 20px;
+}
+
+.help-content li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.help-content strong {
+    color: #fff;
+}
+
+/* レスポンシブ調整 */
+@media (max-width: 1200px) {
+    .main-layout {
+        grid-template-columns: 200px 1fr 250px;
+    }
+}
+
+/* スクロールバー */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}

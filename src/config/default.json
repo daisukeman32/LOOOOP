@@ -1,0 +1,104 @@
+﻿{
+  "version": "1.0.0",
+  "language": "ja",
+  "ui": {
+    "labels": {
+      "import": "インポート",
+      "export": "エクスポート",
+      "play": "再生",
+      "pause": "一時停止",
+      "stop": "停止",
+      "loopCount": "ループ回数",
+      "speedCurve": "速度曲線エディタ",
+      "timeline": "タイムライン",
+      "mediaPool": "メディアプール",
+      "preview": "プレビュー",
+      "inspector": "インスペクター",
+      "reset": "リセット"
+    },
+    "messages": {
+      "importSuccess": "動画を正常に読み込みました",
+      "exportComplete": "エクスポートが完了しました",
+      "unsavedChanges": "保存されていない変更があります",
+      "projectSaved": "プロジェクトを保存しました",
+      "projectLoaded": "プロジェクトを読み込みました",
+      "exportStarted": "エクスポートを開始しています",
+      "exportError": "エクスポート中にエラーが発生しました"
+    }
+  },
+  "defaults": {
+    "outputResolution": "1920x1080",
+    "outputBitrate": 10000000,
+    "outputFps": 30,
+    "previewQuality": "medium",
+    "autoSaveInterval": 300,
+    "maxLoopCount": 99,
+    "minSpeed": 0.1,
+    "maxSpeed": 3.0
+  },
+  "theme": {
+    "name": "dark",
+    "colors": {
+      "background": "#1e1e1e",
+      "surface": "#2d2d2d",
+      "primary": "#0078d4",
+      "text": "#ffffff",
+      "textSecondary": "#cccccc",
+      "border": "#3e3e3e",
+      "graphBackground": "#000000",
+      "graphGrid": "#333333",
+      "graphCurve": "#ffffff",
+      "graphHandle": "#ffffff",
+      "graphHandleHover": "#0078d4"
+    }
+  },
+  "paths": {
+    "defaultProjectDir": "~/Documents/LOOOOP/Projects/",
+    "defaultExportDir": "~/Videos/LOOOOP/",
+    "tempDir": "temp/"
+  },
+  "ffmpeg": {
+    "presetProfiles": {
+      "web": {
+        "resolution": "1920x1080",
+        "bitrate": "5000k",
+        "fps": 30,
+        "codec": "libx264",
+        "preset": "medium"
+      },
+      "social": {
+        "resolution": "1080x1080",
+        "bitrate": "8000k",
+        "fps": 30,
+        "codec": "libx264",
+        "preset": "medium"
+      },
+      "highQuality": {
+        "resolution": "1920x1080",
+        "bitrate": "20000k",
+        "fps": 60,
+        "codec": "libx264",
+        "preset": "slow"
+      }
+    },
+    "proxySettings": {
+      "resolution": "640x360",
+      "bitrate": "1000k",
+      "fps": 30,
+      "codec": "libx264",
+      "preset": "ultrafast"
+    }
+  },
+  "performance": {
+    "maxMemoryUsage": "2GB",
+    "enableGPUAcceleration": true,
+    "maxConcurrentProcesses": 4,
+    "tempFileCleanupInterval": 3600,
+    "cacheSize": "500MB"
+  },
+  "debug": {
+    "enableLogging": true,
+    "logLevel": "info",
+    "enablePerformanceMetrics": false
+  }
+}

@@ -1,0 +1,42 @@
+# Node modules
+node_modules/
+
+# Electron build output
+dist/
+build/
+
+# Temporary files
+temp/
+*.tmp
+
+# Log files
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# FFmpeg binaries (will be added separately)
+# ffmpeg/
+
+# Test and development files
+test-output/
+debug/
+
+# Environment files
+.env
+.env.local
+
+# Backup files
+*.backup
+*~
+
+# Project specific
+*.loooop.backup
