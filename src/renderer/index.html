@@ -27,25 +27,41 @@
 
             <!-- 中央: プレビューパネル -->
             <div class="preview-panel">
-                <h3>プレビュー</h3>
+                <h3>ループ動画プレビュー</h3>
                 <div class="preview-content">
                     <div class="video-container" id="videoContainer">
-                        <video id="previewVideo" controls>
-                            <source src="" type="video/mp4">
-                            お使いのブラウザは動画再生に対応していません。
-                        </video>
+                        <!-- Canvas要素でループプレビュー -->
+                        <canvas id="previewCanvas" width="640" height="480"></canvas>
+                        <!-- 隠しVideo要素（フレーム抽出用） -->
+                        <video id="hiddenVideo" style="display: none;" preload="metadata" muted></video>
                         <div class="preview-overlay" id="previewOverlay">
                             <div class="preview-placeholder">
                                 <div class="preview-icon">🎬</div>
-                                <p>動画を追加してプレビューを開始</p>
+                                <p>動画をセットしてループプレビューを開始</p>
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- シークバー -->
+                    <div class="seekbar-container">
+                        <div class="seekbar" id="seekbar">
+                            <div class="seekbar-track" id="seekbarTrack">
+                                <div class="seekbar-progress" id="seekbarProgress"></div>
+                                <div class="seekbar-thumb" id="seekbarThumb"></div>
+                                <!-- ループマーカー -->
+                                <div class="loop-markers" id="loopMarkers"></div>
+                            </div>
+                        </div>
+                        <div class="frame-info">
+                            <span id="currentFrame">0</span> / <span id="totalFrames">0</span> frames | 
+                            ループ <span id="currentLoop">0</span> / <span id="totalLoops">0</span>
+                        </div>
+                    </div>
+                    
                     <div class="preview-controls">
                         <button class="control-btn" id="playBtn">▶️</button>
                         <button class="control-btn" id="pauseBtn" style="display: none;">⏸️</button>
                         <button class="control-btn" id="stopBtn">⏹️</button>
-                        <button class="control-btn" id="loopBtn">🔄</button>
                         <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
                     </div>
                 </div>
@@ -58,35 +74,39 @@
                     <div class="inspector-section">
                         <label>ループ回数:</label>
                         <input type="number" id="loopCount" min="1" max="99" value="3">
-                        <button class="set-button" id="setToTimeline">タイムラインにセット</button>
+                        <button class="set-button" id="setToTimeline">セット</button>
                     </div>
                     
                     <div class="inspector-section">
-                        <label>速度曲線エディタ:</label>
-                        <div class="speed-curve-editor" id="speedCurveEditor">
-                            <svg id="speedCurveSvg" viewBox="0 0 300 200">
-                                <!-- グリッドライン -->
-                                <defs>
-                                    <pattern id="grid" width="30" height="20" patternUnits="userSpaceOnUse">
-                                        <path d="M 30 0 L 0 0 0 20" fill="none" stroke="#333" stroke-width="0.5"/>
-                                    </pattern>
-                                </defs>
-                                <rect width="300" height="200" fill="url(#grid)"/>
-                                
-                                <!-- 軸ラベル -->
-                                <text x="10" y="15" fill="#ccc" font-size="10">3.0x</text>
-                                <text x="10" y="105" fill="#ccc" font-size="10">2.0x</text>
-                                <text x="10" y="195" fill="#ccc" font-size="10">1.0x</text>
-                                
-                                <!-- デフォルトの速度曲線 -->
-                                <path id="speedCurvePath" d="M 20 180 L 280 180" stroke="#fff" stroke-width="2" fill="none"/>
-                                
-                                <!-- 制御点 -->
-                                <circle id="point1" cx="20" cy="180" r="4" fill="#fff" stroke="#0078d4" stroke-width="2" style="cursor: pointer;"/>
-                                <circle id="point2" cx="280" cy="180" r="4" fill="#fff" stroke="#0078d4" stroke-width="2" style="cursor: pointer;"/>
-                            </svg>
+                        <label>速度パターン:</label>
+                        <div class="speed-pattern-selector">
+                            <select id="speedPreset" class="speed-preset-select">
+                                <option value="linear">一定速度</option>
+                                <option value="easeIn">スロースタート</option>
+                                <option value="easeOut">スローフィニッシュ</option>
+                                <option value="easeInOut">スロースタート&フィニッシュ</option>
+                                <option value="bounce">バウンス</option>
+                                <option value="custom">カスタム</option>
+                            </select>
                         </div>
-                        <button class="reset-button" id="resetCurve">リセット</button>
+                        
+                        <div id="customSpeedControls" class="custom-speed-controls" style="display: none;">
+                            <label class="speed-slider-label">開始速度: <span id="startSpeedValue">1.0x</span></label>
+                            <input type="range" id="startSpeedSlider" min="0.1" max="3.0" step="0.1" value="1.0" class="speed-slider">
+                            
+                            <label class="speed-slider-label">中間速度: <span id="midSpeedValue">1.0x</span></label>
+                            <input type="range" id="midSpeedSlider" min="0.1" max="3.0" step="0.1" value="1.0" class="speed-slider">
+                            
+                            <label class="speed-slider-label">終了速度: <span id="endSpeedValue">1.0x</span></label>
+                            <input type="range" id="endSpeedSlider" min="0.1" max="3.0" step="0.1" value="1.0" class="speed-slider">
+                        </div>
+                        
+                        <div class="speed-curve-preview">
+                            <label>速度プレビュー:</label>
+                            <canvas id="speedPreviewCanvas" width="280" height="120"></canvas>
+                        </div>
+                        
+                        <button class="apply-button" id="applySpeedCurve">速度パターン適用</button>
                     </div>
                 </div>
             </div>
@@ -95,94 +115,47 @@
         <!-- 下部: タイムライン -->
         <div class="timeline-panel">
             <h3>タイムライン</h3>
+            
+            <!-- シークバーとコントロール -->
+            <div class="timeline-seekbar-container">
+                <div class="playback-controls">
+                    <button id="playBtn" class="control-btn">▶️</button>
+                    <button id="pauseBtn" class="control-btn" style="display: none;">⏸️</button>
+                    <button id="stopBtn" class="control-btn">⏹️</button>
+                </div>
+                <div class="seekbar-container">
+                    <input type="range" id="timelineSeekbar" class="timeline-seekbar" min="0" max="100" value="0">
+                    <div class="time-display">
+                        <span id="currentTimeDisplay">00:00</span>
+                        <span>/</span>
+                        <span id="totalTimeDisplay">00:00</span>
+                    </div>
+                </div>
+            </div>
+            
             <div class="timeline-content" id="timeline">
+                <div class="timeline-ruler">
+                    <div class="ruler-markers" id="rulerMarkers"></div>
+                </div>
                 <div class="timeline-track" id="timelineTrack">
                     <div class="timeline-placeholder">
-                        <p>ここにクリップをドロップして編集を開始</p>
+                        <p>ここにクリップをセットして編集を開始</p>
                     </div>
+                    <div class="playhead" id="playhead"></div>
                 </div>
                 <div class="timeline-controls">
-                    <span class="timeline-info" id="timelineInfo">Timeline: 00:00 / 00:00</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- モーダルダイアログ -->
-        <div class="modal" id="exportModal" style="display: none;">
-            <div class="modal-content">
-                <h2>動画のエクスポート</h2>
-                <div class="export-settings">
-                    <div class="setting-group">
-                        <label for="fileName">ファイル名:</label>
-                        <input type="text" id="fileName" value="output_001.mp4">
+                    <span class="timeline-info" id="timelineInfo">セット待機中...</span>
+                    <div class="timeline-help">
+                        <small>💡 ドラッグで並び替え | Ctrl+S: セット | Space: 再生/停止 | ←→: フレーム移動</small>
                     </div>
-                    <div class="setting-group">
-                        <label for="resolution">解像度:</label>
-                        <select id="resolution">
-                            <option value="1920x1080">1920x1080 (Full HD)</option>
-                            <option value="1280x720">1280x720 (HD)</option>
-                            <option value="3840x2160">3840x2160 (4K)</option>
-                        </select>
-                    </div>
-                    <div class="setting-group">
-                        <label for="bitrate">ビットレート:</label>
-                        <select id="bitrate">
-                            <option value="5000000">5 Mbps</option>
-                            <option value="10000000" selected>10 Mbps</option>
-                            <option value="20000000">20 Mbps</option>
-                        </select>
-                    </div>
-                    <div class="setting-group">
-                        <label for="fps">FPS:</label>
-                        <select id="fps">
-                            <option value="24">24</option>
-                            <option value="30" selected>30</option>
-                            <option value="60">60</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="progress-section" id="progressSection" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <p id="progressText">準備中...</p>
-                </div>
-                <div class="modal-buttons">
-                    <button class="cancel-button" id="cancelExport">キャンセル</button>
-                    <button class="export-button" id="startExport">エクスポート</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- ヘルプガイドモーダル -->
-        <div class="modal" id="helpModal" style="display: none;">
-            <div class="modal-content">
-                <h2>クイックガイド</h2>
-                <div class="help-content">
-                    <h3>基本的な使い方:</h3>
-                    <ol>
-                        <li><strong>動画をインポート</strong><br>メディアプールの「インポート」ボタンをクリック、またはファイルをドラッグ&ドロップ</li>
-                        <li><strong>タイムラインに配置</strong><br>メディアプールからタイムラインへクリップをドラッグ</li>
-                        <li><strong>ループ回数設定</strong><br>インスペクターでループ回数を調整</li>
-                        <li><strong>速度調整</strong><br>速度曲線エディタで制御点をドラッグして速度変化を設定</li>
-                        <li><strong>エクスポート</strong><br>メニューから「Export Video」を選択して出力</li>
-                    </ol>
-                    
-                    <h3>キーボードショートカット:</h3>
-                    <ul>
-                        <li><strong>Space</strong> - 再生/一時停止</li>
-                        <li><strong>Ctrl+S</strong> - プロジェクトを保存</li>
-                        <li><strong>Ctrl+I</strong> - 動画をインポート</li>
-                        <li><strong>Ctrl+E</strong> - 動画をエクスポート</li>
-                    </ul>
-                </div>
-                <div class="modal-buttons">
-                    <button class="close-button" id="closeHelp">閉じる</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ファイル入力（非表示） -->
+    <input type="file" id="fileInput" accept="video/*" style="display: none;" multiple>
+    
     <script src="app.js"></script>
 </body>
 </html>

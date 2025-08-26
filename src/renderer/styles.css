@@ -6,11 +6,12 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1e1e1e;
-    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    color: #e0e0e0;
     overflow: hidden;
     user-select: none;
+    height: 100vh;
 }
 
 #app {
@@ -114,10 +115,25 @@ body {
     cursor: grabbing;
 }
 
-.media-clip img {
+.media-clip.selected {
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px #0078d4;
+}
+
+.thumbnail-container {
     width: 100%;
     height: 80%;
-    object-fit: cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #1a1a1a;
+}
+
+.thumbnail-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 2px;
 }
 
 .media-clip .clip-name {
@@ -136,34 +152,49 @@ body {
 /* プレビューパネル */
 .preview-content {
     flex: 1;
-    padding: 12px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
+    background: linear-gradient(135deg, #2d2d2d 0%, #333 100%);
+}
+
+/* Canvas要素 */
+#previewCanvas {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    display: block;
+    background: linear-gradient(135deg, #000 0%, #111 100%);
+    border-radius: 8px;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
 }
 
 .video-container {
     flex: 1;
     position: relative;
-    background-color: #000;
-    border-radius: 4px;
-    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    border-radius: 8px;
+    border: 1px solid #444;
+    overflow: visible;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-}
-
-#previewVideo {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
+    min-height: 300px;
+    padding: 15px;
+    margin-bottom: 15px;
 }
 
 .preview-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(42, 42, 42, 0.95);
+    border-radius: 6px;
+    border: 1px solid #555;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -209,6 +240,81 @@ body {
     margin-left: auto;
     font-size: 14px;
     color: #cccccc;
+    font-family: 'Courier New', monospace;
+}
+
+/* シークバー */
+.seekbar-container {
+    padding: 8px 0;
+    margin: 8px 0;
+}
+
+.seekbar {
+    position: relative;
+    height: 40px;
+    background-color: #1a1a1a;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.seekbar-track {
+    position: relative;
+    height: 32px;
+    background-color: #2d2d2d;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.seekbar-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #0078d4, #106ebe);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.1s ease;
+}
+
+.seekbar-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 24px;
+    background-color: #fff;
+    border: 2px solid #0078d4;
+    border-radius: 2px;
+    cursor: grab;
+    left: 0;
+}
+
+.seekbar-thumb:active {
+    cursor: grabbing;
+}
+
+.loop-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.loop-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: rgba(255, 200, 0, 0.6);
+}
+
+.frame-info {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
     font-family: 'Courier New', monospace;
 }
 
@@ -287,14 +393,142 @@ body {
 
 /* タイムラインパネル */
 .timeline-panel {
-    height: 30vh;
+    height: 35vh;
     border-top: 1px solid #3e3e3e;
+    background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+    border-radius: 12px;
+    margin-top: 15px;
+    border: 1px solid #444;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+/* シークバーとコントロール */
+.timeline-seekbar-container {
+    display: flex;
+    align-items: center;
+    margin: 15px;
+    padding: 12px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.playback-controls {
+    display: flex;
+    gap: 8px;
+    margin-right: 15px;
+}
+
+.control-btn {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 40px;
+    font-family: inherit;
+}
+
+.control-btn:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.control-btn:active {
+    transform: translateY(0);
+}
+
+.seekbar-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.timeline-seekbar {
+    flex: 1;
+    height: 6px;
+    background: linear-gradient(135deg, #333 0%, #444 100%);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    border: 1px solid #555;
+}
+
+.timeline-seekbar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.timeline-seekbar::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.time-display {
+    color: #ccc;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    min-width: 80px;
+    text-align: center;
+}
+
+/* タイムライン定規 */
+.timeline-ruler {
+    height: 25px;
+    background: linear-gradient(135deg, #2a2a2a 0%, #333 100%);
+    border-bottom: 1px solid #555;
+    position: relative;
+    margin: 0 15px;
+}
+
+.ruler-markers {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 49px,
+        #666 49px,
+        #666 51px
+    );
+}
+
+/* プレイヘッド */
+.playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #ff4444 0%, #cc3333 100%);
+    z-index: 10;
+    left: 0;
+    transition: left 0.1s ease;
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.6);
 }
 
 .timeline-content {
     flex: 1;
     display: flex;
     flex-direction: column;
+    position: relative;
+    overflow-y: auto;
 }
 
 .timeline-track {
@@ -358,140 +592,6 @@ body {
     box-shadow: 0 0 0 2px #0078d4;
 }
 
-/* モーダル */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background-color: #2d2d2d;
-    border: 1px solid #3e3e3e;
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 500px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.modal-content h2 {
-    margin-bottom: 20px;
-    color: #fff;
-    font-size: 18px;
-}
-
-.export-settings, .help-content {
-    margin-bottom: 20px;
-}
-
-.setting-group {
-    margin-bottom: 16px;
-}
-
-.setting-group label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 14px;
-    color: #ccc;
-}
-
-.setting-group input, .setting-group select {
-    width: 100%;
-    padding: 8px;
-    background-color: #3e3e3e;
-    color: white;
-    border: 1px solid #555;
-    border-radius: 4px;
-}
-
-.progress-section {
-    margin: 20px 0;
-}
-
-.progress-bar {
-    width: 100%;
-    height: 20px;
-    background-color: #3e3e3e;
-    border-radius: 10px;
-    overflow: hidden;
-    margin-bottom: 8px;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #0078d4, #106ebe);
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-#progressText {
-    font-size: 14px;
-    color: #ccc;
-    text-align: center;
-}
-
-.modal-buttons {
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-}
-
-.modal-buttons button {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s ease;
-}
-
-.cancel-button, .close-button {
-    background-color: #666;
-    color: white;
-}
-
-.cancel-button:hover, .close-button:hover {
-    background-color: #777;
-}
-
-.export-button {
-    background-color: #0078d4;
-    color: white;
-}
-
-.export-button:hover {
-    background-color: #106ebe;
-}
-
-/* ヘルプコンテンツ */
-.help-content h3 {
-    color: #0078d4;
-    margin: 16px 0 8px 0;
-    font-size: 16px;
-}
-
-.help-content ol, .help-content ul {
-    margin-left: 20px;
-}
-
-.help-content li {
-    margin-bottom: 8px;
-    line-height: 1.5;
-}
-
-.help-content strong {
-    color: #fff;
-}
-
 /* レスポンシブ調整 */
 @media (max-width: 1200px) {
     .main-layout {
@@ -515,4 +615,136 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #666;
+}
+
+/* 新しい速度パターン選択 */
+.speed-pattern-selector {
+    margin-top: 8px;
+}
+
+.speed-preset-select {
+    width: 100%;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #3e3e3e 0%, #4e4e4e 100%);
+    color: white;
+    border: 1px solid #555;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.speed-preset-select:hover {
+    background: linear-gradient(135deg, #4e4e4e 0%, #5e5e5e 100%);
+    border-color: #666;
+}
+
+.speed-preset-select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+}
+
+/* カスタムスピードコントロール */
+.custom-speed-controls {
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(42, 42, 42, 0.5);
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.speed-slider-label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #ccc;
+    font-weight: 600;
+}
+
+.speed-slider-label span {
+    float: right;
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.speed-slider {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(135deg, #333 0%, #444 100%);
+    border-radius: 3px;
+    outline: none;
+    margin-bottom: 15px;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    transition: all 0.2s ease;
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+}
+
+.speed-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* 速度プレビューキャンバス */
+.speed-curve-preview {
+    margin-top: 15px;
+}
+
+.speed-curve-preview label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+#speedPreviewCanvas {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    border: 1px solid #444;
+    border-radius: 6px;
+    width: 100%;
+    height: 80px;
+}
+
+.apply-button {
+    width: 100%;
+    margin-top: 15px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.apply-button:hover {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.apply-button:active {
+    transform: translateY(0);
 }

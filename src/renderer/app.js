@@ -1,38 +1,69 @@
-// LOOOOP メインアプリケーション
+// LOOOOP メインアプリケーション - 正しいワークフロー実装
 class LOOOOPApp {
     constructor() {
-        this.project = {
-            name: 'Untitled Project',
-            timeline: [],
-            settings: {
-                resolution: '1920x1080',
-                bitrate: 10000000,
-                fps: 30
-            }
-        };
-        
+        // 基本状態管理
         this.selectedClip = null;
         this.isPlaying = false;
-        this.currentFilePath = null;
+        this.currentFrame = 0;
+        this.totalFrames = 0;
+        this.loopCount = 3;
+        this.isSet = false; // セット状態管理
         
-        // ループ再生制御
-        this.loopState = {
-            isLooping: false,
-            currentLoop: 0,
-            totalLoops: 3,
-            isReverse: false,
-            playbackDirection: 1 // 1: forward, -1: reverse
-        };
+        // タイムライン管理
+        this.timelineClips = []; // セットされたクリップの配列
+        
+        // Canvas/Video要素
+        this.canvas = null;
+        this.ctx = null;
+        this.hiddenVideo = null;
+        this.frames = [];
+        
+        // 速度制御
+        this.speedCurveData = [];
+        this.currentSpeed = 1.0;
+        
+        // アニメーション
+        this.animationId = null;
+        this.lastFrameTime = 0;
         
         this.init();
     }
     
     init() {
+        this.initializeElements();
         this.setupEventListeners();
-        this.setupMenuEventListeners();
-        this.setupDragAndDrop();
-        this.initializeSpeedCurveEditor();
-        console.log('LOOOOP App initialized');
+        this.initializeNewSpeedSystem();
+        console.log('LOOOOP App initialized with correct workflow');
+    }
+    
+    initializeElements() {
+        this.canvas = document.getElementById('previewCanvas');
+        this.hiddenVideo = document.getElementById('hiddenVideo');
+        
+        if (!this.canvas) {
+            console.error('❌ Canvas element not found!');
+            return;
+        }
+        
+        if (!this.hiddenVideo) {
+            console.error('❌ Hidden video element not found!');
+            return;
+        }
+        
+        this.ctx = this.canvas.getContext('2d');
+        
+        // Canvas初期設定
+        this.canvas.width = 640;
+        this.canvas.height = 360;
+        
+        // 黒背景で初期化
+        if (this.ctx) {
+            this.ctx.fillStyle = '#000';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            console.log('✅ Canvas initialized: 640x360');
+        }
+        
+        console.log('Elements initialized');
     }
     
     setupEventListeners() {
@@ -41,366 +72,169 @@ class LOOOOPApp {
             this.importVideos();
         });
         
-        // プレビューコントロール
+        // ドラッグ&ドロップ
+        this.setupDragAndDrop();
+        
+        // セットボタン（重要な機能）
+        document.getElementById('setToTimeline').addEventListener('click', () => {
+            this.setToTimeline();
+        });
+        
+        // 再生コントロール
         document.getElementById('playBtn').addEventListener('click', () => {
-            this.playVideo();
+            if (this.isSet) this.playLoop();
         });
         
         document.getElementById('pauseBtn').addEventListener('click', () => {
-            this.pauseVideo();
+            this.pauseLoop();
         });
         
         document.getElementById('stopBtn').addEventListener('click', () => {
-            this.stopVideo();
+            this.stopLoop();
         });
         
-        document.getElementById('loopBtn').addEventListener('click', () => {
-            this.toggleLoop();
+        // ループ回数変更（リアルタイム反映）
+        document.getElementById('loopCount').addEventListener('input', (e) => {
+            this.loopCount = parseInt(e.target.value) || 3;
+            if (this.isSet) {
+                this.updateLoopSettings(); // 即座に反映
+            }
         });
         
-        // インスペクター
-        document.getElementById('loopCount').addEventListener('change', (e) => {
-            this.updateLoopCount(parseInt(e.target.value));
+        // 新しい速度パターンシステム
+        this.setupNewSpeedEditor();
+        
+        // 新しいコントロールボタン
+        document.getElementById('playBtn').addEventListener('click', () => {
+            this.playLoop();
         });
         
-        document.getElementById('resetCurve').addEventListener('click', () => {
-            this.resetSpeedCurve();
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            this.pauseLoop();
         });
         
-        // セットボタン
-        document.getElementById('setToTimeline').addEventListener('click', () => {
-            this.setClipToTimeline();
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            this.stopLoop();
         });
         
-        // エクスポートモーダル
-        document.getElementById('startExport').addEventListener('click', () => {
-            this.startExport();
-        });
+        // 新しいタイムラインシークバー
+        this.setupTimelineSeekbar();
         
-        document.getElementById('cancelExport').addEventListener('click', () => {
-            this.hideModal('exportModal');
-        });
-        
-        // ヘルプモーダル
-        document.getElementById('closeHelp').addEventListener('click', () => {
-            this.hideModal('helpModal');
-        });
+        // 従来のシークバーも維持
+        this.setupSeekbar();
         
         // キーボードショートカット
         document.addEventListener('keydown', (e) => {
             this.handleKeyboardShortcut(e);
         });
-    }
-    
-    setupMenuEventListeners() {
-        if (window.electronAPI) {
-            window.electronAPI.onMenuNewProject(() => {
-                this.newProject();
-            });
-            
-            window.electronAPI.onMenuOpenProject((event, filePath) => {
-                this.openProject(filePath);
-            });
-            
-            window.electronAPI.onMenuSaveProject(() => {
-                this.saveProject();
-            });
-            
-            window.electronAPI.onMenuImportVideos((event, filePaths) => {
-                this.addVideosToMediaPool(filePaths);
-            });
-            
-            window.electronAPI.onMenuExportVideo(() => {
-                this.showModal('exportModal');
-            });
-            
-            window.electronAPI.onMenuShowGuide(() => {
-                this.showModal('helpModal');
-            });
-        }
+        
+        console.log('Event listeners setup completed');
     }
     
     setupDragAndDrop() {
         const importArea = document.getElementById('importArea');
-        const timeline = document.getElementById('timelineTrack');
         
-        // メディアプールへのドロップ（thisコンテキストを修正）
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            importArea.addEventListener(eventName, this.preventDefaults.bind(this), false);
+            importArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
         });
         
         ['dragenter', 'dragover'].forEach(eventName => {
             importArea.addEventListener(eventName, () => {
                 importArea.classList.add('drag-over');
-            }, false);
+            });
         });
         
         ['dragleave', 'drop'].forEach(eventName => {
             importArea.addEventListener(eventName, () => {
                 importArea.classList.remove('drag-over');
-            }, false);
-        });
-        
-        importArea.addEventListener('drop', (e) => {
-            try {
-                const files = Array.from(e.dataTransfer.files)
-                    .filter(file => file.type.startsWith('video/'));
-                
-                if (files.length > 0) {
-                    const filePaths = files.map(file => file.path);
-                    this.addVideosToMediaPool(filePaths);
-                } else {
-                    console.warn('No video files found in dropped items');
-                }
-            } catch (error) {
-                console.error('Error processing dropped files:', error);
-            }
-        }, false);
-    }
-    
-    preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    
-    initializeSpeedCurveEditor() {
-        const svg = document.getElementById('speedCurveSvg');
-        const path = document.getElementById('speedCurvePath');
-        const points = [
-            document.getElementById('point1'),
-            document.getElementById('point2')
-        ];
-        
-        let dragging = null;
-        
-        points.forEach((point, index) => {
-            point.addEventListener('mousedown', (e) => {
-                dragging = { point, index };
-                e.preventDefault();
             });
         });
         
-        svg.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
+        importArea.addEventListener('drop', (e) => {
+            const files = Array.from(e.dataTransfer.files)
+                .filter(file => file.type.startsWith('video/'));
             
-            const rect = svg.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 300;
-            const y = ((e.clientY - rect.top) / rect.height) * 200;
-            
-            // 制限範囲内に収める
-            const clampedX = Math.max(20, Math.min(280, x));
-            const clampedY = Math.max(20, Math.min(180, y));
-            
-            dragging.point.setAttribute('cx', clampedX);
-            dragging.point.setAttribute('cy', clampedY);
-            
-            this.updateSpeedCurvePath();
-        });
-        
-        document.addEventListener('mouseup', () => {
-            dragging = null;
-        });
-        
-        // SVGクリックで制御点追加
-        svg.addEventListener('click', (e) => {
-            if (e.target === svg || e.target.tagName === 'rect') {
-                this.addSpeedCurvePoint(e);
+            if (files.length > 0) {
+                this.addVideosToMediaPool(files);
             }
         });
     }
     
-    updateSpeedCurvePath() {
-        const points = Array.from(document.querySelectorAll('#speedCurveSvg circle'))
-            .map(point => ({
-                x: parseFloat(point.getAttribute('cx')),
-                y: parseFloat(point.getAttribute('cy'))
-            }))
-            .sort((a, b) => a.x - b.x);
-        
-        if (points.length < 2) return;
-        
-        const path = document.getElementById('speedCurvePath');
-        let pathData = `M ${points[0].x} ${points[0].y}`;
-        
-        for (let i = 1; i < points.length; i++) {
-            pathData += ` L ${points[i].x} ${points[i].y}`;
-        }
-        
-        path.setAttribute('d', pathData);
-    }
-    
-    addSpeedCurvePoint(e) {
-        const svg = document.getElementById('speedCurveSvg');
-        const rect = svg.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 300;
-        const y = ((e.clientY - rect.top) / rect.height) * 200;
-        
-        const newPoint = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        newPoint.setAttribute('cx', x);
-        newPoint.setAttribute('cy', y);
-        newPoint.setAttribute('r', '4');
-        newPoint.setAttribute('fill', '#fff');
-        newPoint.setAttribute('stroke', '#0078d4');
-        newPoint.setAttribute('stroke-width', '2');
-        newPoint.style.cursor = 'pointer';
-        
-        // 右クリックで削除
-        newPoint.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (svg.querySelectorAll('circle').length > 2) { // 最低2点は維持
-                newPoint.remove();
-                this.updateSpeedCurvePath();
-            }
-        });
-        
-        svg.appendChild(newPoint);
-        this.updateSpeedCurvePath();
-    }
-    
-    setClipToTimeline() {
-        if (!this.selectedClip) {
-            alert('まずメディアプールからクリップを選択してください');
-            return;
-        }
-        
-        const loopCount = parseInt(document.getElementById('loopCount').value) || 3;
-        this.selectedClip.loopCount = loopCount;
-        
-        // タイムラインに追加
-        const timeline = document.getElementById('timelineTrack');
-        const placeholder = timeline.querySelector('.timeline-placeholder');
-        
-        if (placeholder) {
-            placeholder.style.display = 'none';
-        }
-        
-        const timelineClip = document.createElement('div');
-        timelineClip.className = 'timeline-clip';
-        timelineClip.style.left = `${this.project.timeline.length * 120}px`;
-        timelineClip.innerHTML = `
-            <div>${this.selectedClip.fileName}</div>
-            <div>Loop: ${loopCount}</div>
-        `;
-        
-        // タイムラインクリップのクリックイベント
-        timelineClip.addEventListener('click', () => {
-            this.selectTimelineClip(timelineClip);
-        });
-        
-        timeline.appendChild(timelineClip);
-        
-        // プロジェクトデータに追加
-        this.project.timeline.push({
-            ...this.selectedClip,
-            id: Date.now(),
-            position: this.project.timeline.length
-        });
-        
-        console.log(`Set clip to timeline: ${this.selectedClip.fileName} (${loopCount} loops)`);
-        this.updateTimelineInfo();
-    }
-    
-    selectTimelineClip(clipElement) {
-        // 他の選択を解除
-        document.querySelectorAll('.timeline-clip').forEach(clip => {
-            clip.classList.remove('selected');
-        });
-        
-        clipElement.classList.add('selected');
-        console.log('Selected timeline clip');
-    }
-    
-    updateTimelineInfo() {
-        const totalClips = this.project.timeline.length;
-        const totalLoops = this.project.timeline.reduce((sum, clip) => sum + clip.loopCount, 0);
-        
-        document.getElementById('timelineInfo').textContent = 
-            `Timeline: ${totalClips} clips, ${totalLoops} total loops`;
-    }
-    
-    resetSpeedCurve() {
-        const svg = document.getElementById('speedCurveSvg');
-        const circles = svg.querySelectorAll('circle');
-        
-        // デフォルトの2点以外を削除
-        for (let i = circles.length - 1; i >= 2; i--) {
-            circles[i].remove();
-        }
-        
-        // デフォルト位置にリセット
-        document.getElementById('point1').setAttribute('cx', '20');
-        document.getElementById('point1').setAttribute('cy', '180');
-        document.getElementById('point2').setAttribute('cx', '280');
-        document.getElementById('point2').setAttribute('cy', '180');
-        
-        this.updateSpeedCurvePath();
-    }
-    
+    // 1. 動画インポート → サムネ表示
     async importVideos() {
-        // ファイル選択用の隠しinput要素を作成
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'video/*';
-        input.multiple = true;
-        
-        input.onchange = (event) => {
+        const fileInput = document.getElementById('fileInput');
+        fileInput.onchange = (event) => {
             const files = Array.from(event.target.files);
             if (files.length > 0) {
-                const filePaths = files.map(file => file.path || file.name);
-                this.addVideosToMediaPool(filePaths);
-                console.log(`Imported ${files.length} videos via button`);
+                this.addVideosToMediaPool(files);
             }
         };
-        
-        // ファイル選択ダイアログを開く
-        input.click();
+        fileInput.click();
     }
     
-    addVideosToMediaPool(filePaths) {
+    addVideosToMediaPool(files) {
         const mediaPool = document.getElementById('mediaPool');
+        const importArea = document.getElementById('importArea');
         
-        filePaths.forEach(filePath => {
-            const clipElement = this.createMediaClipElement(filePath);
-            
-            // インポートエリアの前に挿入
-            const importArea = document.getElementById('importArea');
+        files.forEach(file => {
+            const clipElement = this.createMediaClipElement(file);
             mediaPool.insertBefore(clipElement, importArea);
         });
         
-        console.log(`Added ${filePaths.length} videos to media pool`);
+        console.log(`✅ Added ${files.length} videos with thumbnails to media pool`);
     }
     
-    createMediaClipElement(filePath) {
+    createMediaClipElement(file) {
         const clip = document.createElement('div');
         clip.className = 'media-clip';
-        clip.draggable = true;
-        clip.dataset.filePath = filePath;
+        clip.dataset.filePath = file.path || URL.createObjectURL(file);
         
-        // ファイル名を抽出
-        const fileName = filePath.split(/[\\/]/).pop();
+        // サムネ生成
+        const video = document.createElement('video');
+        video.src = clip.dataset.filePath;
+        video.muted = true;
+        video.preload = 'metadata';
         
-        clip.innerHTML = `
-            <div class="clip-thumbnail" style="width: 100%; height: 80%; background: linear-gradient(45deg, #333, #555); display: flex; align-items: center; justify-content: center; color: #ccc; font-size: 24px;">
-                🎬
-            </div>
-            <div class="clip-name">${fileName}</div>
-        `;
+        video.addEventListener('loadedmetadata', () => {
+            video.currentTime = Math.min(1, video.duration / 2); // 中間地点をサムネに
+        });
         
-        // ドラッグ開始
-        clip.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', filePath);
-            e.dataTransfer.effectAllowed = 'copy';
+        video.addEventListener('seeked', () => {
+            const thumbnailCanvas = document.createElement('canvas');
+            const aspectRatio = video.videoWidth / video.videoHeight;
+            
+            // 適切なサムネイルサイズを計算
+            if (aspectRatio > 1.6) { // 横長動画
+                thumbnailCanvas.width = 200;
+                thumbnailCanvas.height = Math.round(200 / aspectRatio);
+            } else { // 正方形や縦長動画
+                thumbnailCanvas.height = 90;
+                thumbnailCanvas.width = Math.round(90 * aspectRatio);
+            }
+            
+            const thumbCtx = thumbnailCanvas.getContext('2d');
+            thumbCtx.drawImage(video, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+            
+            clip.innerHTML = `
+                <div class="thumbnail-container">
+                    <img src="${thumbnailCanvas.toDataURL()}" alt="thumbnail">
+                </div>
+                <div class="clip-name">${file.name}</div>
+            `;
         });
         
         // クリック選択
         clip.addEventListener('click', () => {
-            this.selectMediaClip(clip);
+            this.selectMediaClip(clip, file);
         });
         
         return clip;
     }
     
-    selectMediaClip(clipElement) {
+    selectMediaClip(clipElement, file) {
         // 他の選択を解除
         document.querySelectorAll('.media-clip').forEach(clip => {
             clip.classList.remove('selected');
@@ -409,170 +243,632 @@ class LOOOOPApp {
         clipElement.classList.add('selected');
         this.selectedClip = {
             filePath: clipElement.dataset.filePath,
-            fileName: clipElement.querySelector('.clip-name').textContent,
-            loopCount: parseInt(document.getElementById('loopCount').value) || 3,
+            fileName: file.name,
+            file: file,
             element: clipElement
         };
         
-        this.loadVideoForPreview(clipElement.dataset.filePath);
-        console.log('Selected clip:', this.selectedClip);
+        console.log('✅ Selected clip:', this.selectedClip.fileName);
     }
     
-    loadVideoForPreview(filePath) {
-        const video = document.getElementById('previewVideo');
-        const overlay = document.getElementById('previewOverlay');
-        
-        video.src = filePath;
-        overlay.style.display = 'none';
-        
-        video.addEventListener('loadedmetadata', () => {
-            this.updateTimeDisplay();
-        });
-        
-        console.log(`Loaded video for preview: ${filePath}`);
-    }
-    
-    playVideo() {
-        const video = document.getElementById('previewVideo');
-        if (video.src) {
-            if (this.loopState.isLooping) {
-                this.startLoopPlayback();
-            } else {
-                video.play();
-            }
-            this.isPlaying = true;
-            document.getElementById('playBtn').style.display = 'none';
-            document.getElementById('pauseBtn').style.display = 'inline-block';
-        }
-    }
-    
-    pauseVideo() {
-        const video = document.getElementById('previewVideo');
-        video.pause();
-        this.isPlaying = false;
-        this.stopLoopPlayback();
-        document.getElementById('playBtn').style.display = 'inline-block';
-        document.getElementById('pauseBtn').style.display = 'none';
-    }
-    
-    stopVideo() {
-        const video = document.getElementById('previewVideo');
-        video.pause();
-        video.currentTime = 0;
-        this.isPlaying = false;
-        this.stopLoopPlayback();
-        document.getElementById('playBtn').style.display = 'inline-block';
-        document.getElementById('pauseBtn').style.display = 'none';
-    }
-    
-    toggleLoop() {
-        this.loopState.isLooping = !this.loopState.isLooping;
-        this.loopState.totalLoops = parseInt(document.getElementById('loopCount').value) || 3;
-        
-        const loopBtn = document.getElementById('loopBtn');
-        loopBtn.style.backgroundColor = this.loopState.isLooping ? '#0078d4' : '#3e3e3e';
-        
-        const video = document.getElementById('previewVideo');
-        if (!this.loopState.isLooping) {
-            // 通常再生に戻す
-            video.loop = false;
-            this.stopLoopPlayback();
-        }
-        
-        console.log(`Loop mode: ${this.loopState.isLooping ? 'ON' : 'OFF'} (${this.loopState.totalLoops} loops)`);
-    }
-    
-    updateLoopCount(count) {
-        this.loopState.totalLoops = count;
-        if (this.selectedClip) {
-            this.selectedClip.loopCount = count;
-        }
-        console.log(`Updated loop count to: ${count}`);
-    }
-    
-    startLoopPlayback() {
-        const video = document.getElementById('previewVideo');
-        if (!video.src || !video.duration) return;
-        
-        // ループ状態をリセット
-        this.loopState.currentLoop = 0;
-        this.loopState.isReverse = false;
-        this.loopState.playbackDirection = 1;
-        
-        // 動画を最初から開始
-        video.currentTime = 0;
-        video.pause();
-        
-        console.log(`Starting loop playback: ${this.loopState.totalLoops} loops`);
-        this.updateLoopPlayback();
-    }
-    
-    stopLoopPlayback() {
-        if (this.loopAnimationId) {
-            cancelAnimationFrame(this.loopAnimationId);
-            this.loopAnimationId = null;
-        }
-        this.loopState.currentLoop = 0;
-        this.loopState.isReverse = false;
-        console.log('Loop playback stopped');
-    }
-    
-    updateLoopPlayback() {
-        if (!this.isPlaying || !this.loopState.isLooping) return;
-        
-        const video = document.getElementById('previewVideo');
-        const duration = video.duration;
-        
-        if (this.loopState.currentLoop >= this.loopState.totalLoops) {
-            // ループ完了
-            this.pauseVideo();
-            this.loopState.currentLoop = 0;
-            video.currentTime = 0;
-            console.log('All loops completed');
+    // 2. セット機能（重要）- 複数クリップ対応
+    async setToTimeline() {
+        if (!this.selectedClip) {
+            alert('まず動画を選択してください');
             return;
         }
         
-        // フレーム更新
-        const frameTime = 1000 / 30; // 30fps
+        console.log('🔄 Setting clip to timeline...');
         
-        if (!this.loopState.isReverse) {
-            // 正再生
-            video.currentTime += (frameTime / 1000);
+        try {
+            // 動画を読み込んでフレーム情報を取得
+            const frameData = await this.loadVideoFrames(this.selectedClip);
             
-            if (video.currentTime >= duration) {
-                // 正再生終了、逆再生開始
-                this.loopState.isReverse = true;
-                video.currentTime = duration;
-                console.log(`Loop ${this.loopState.currentLoop + 1}: Forward complete, starting reverse`);
-            }
-        } else {
-            // 逆再生
-            video.currentTime -= (frameTime / 1000);
+            // タイムラインクリップオブジェクトを作成
+            const timelineClip = {
+                id: Date.now(),
+                ...this.selectedClip,
+                loopCount: this.loopCount,
+                frames: frameData.frames,
+                duration: frameData.duration,
+                startTime: this.calculateTotalDuration(), // 現在の総時間
+                selected: false
+            };
             
-            if (video.currentTime <= 0) {
-                // 逆再生終了、次のループへ
-                this.loopState.isReverse = false;
-                this.loopState.currentLoop++;
-                video.currentTime = 0;
-                console.log(`Loop ${this.loopState.currentLoop}: Complete (${this.loopState.currentLoop}/${this.loopState.totalLoops})`);
-            }
+            // タイムラインに追加
+            this.timelineClips.push(timelineClip);
+            this.isSet = true;
+            
+            // ⚡ 重要: 最初のクリップのframesを一時的に設定（後で複数クリップ対応に変更）
+            this.frames = frameData.frames;
+            this.selectedTimelineClip = timelineClip;
+            this.currentClipId = null; // 動画切り替え用ID
+            
+            // hiddenVideoに動画をセット（完全準備まで待機）
+            this.hiddenVideo.src = this.selectedClip.filePath;
+            await new Promise((resolve, reject) => {
+                this.hiddenVideo.oncanplaythrough = () => {
+                    console.log('✅ Hidden video ready for playback');
+                    resolve();
+                };
+                this.hiddenVideo.onerror = reject;
+            });
+            
+            // フレーム総数更新
+            this.updateTotalFrames();
+            
+            // UI更新
+            this.updateUI();
+            this.renderTimeline();
+            
+            console.log(`✅ Clip set successfully - ${this.frames.length} frames ready`);
+            console.log(`📊 Total frames: ${this.totalFrames} (${this.loopCount} loops)`);
+            
+        } catch (error) {
+            console.error('❌ Failed to set clip:', error);
+            alert('動画の読み込みに失敗しました');
         }
-        
-        // 次のフレーム
-        this.loopAnimationId = requestAnimationFrame(() => {
-            this.updateLoopPlayback();
+    }
+    
+    async loadVideoFrames(clip) {
+        return new Promise((resolve, reject) => {
+            const tempVideo = document.createElement('video');
+            tempVideo.src = clip.filePath;
+            tempVideo.muted = true;
+            
+            tempVideo.onloadedmetadata = () => {
+                const duration = tempVideo.duration;
+                const fps = 30;
+                const frameCount = Math.floor(duration * fps);
+                
+                const frames = Array.from({length: frameCount}, (_, i) => ({
+                    index: i,
+                    time: i / fps
+                }));
+                
+                resolve({ frames, duration });
+            };
+            
+            tempVideo.onerror = reject;
         });
     }
     
-    updateTimeDisplay() {
-        const video = document.getElementById('previewVideo');
-        const display = document.getElementById('timeDisplay');
-        
-        if (video.duration) {
-            const current = this.formatTime(video.currentTime);
-            const total = this.formatTime(video.duration);
-            display.textContent = `${current} / ${total}`;
+    calculateTotalDuration() {
+        return this.timelineClips.reduce((total, clip) => {
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            const clipTotalFrames = framesPerLoop * clip.loopCount;
+            return total + (clipTotalFrames / 30); // 30fps基準で秒数計算
+        }, 0);
+    }
+    
+    updateTotalFrames() {
+        // 🎬 複数動画対応: 全クリップの総フレーム数を計算
+        if (!this.timelineClips || this.timelineClips.length === 0) {
+            this.totalFrames = 0;
+            return;
         }
+        
+        this.totalFrames = this.timelineClips.reduce((total, clip) => {
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            const clipTotalFrames = framesPerLoop * clip.loopCount;
+            return total + clipTotalFrames;
+        }, 0);
+        
+        // UI更新
+        document.getElementById('totalFrames').textContent = this.totalFrames;
+        document.getElementById('totalLoops').textContent = this.timelineClips.length;
+        
+        console.log(`📊 Total frames: ${this.totalFrames} (${this.timelineClips.length} clips)`);
+    }
+    
+    updateUI() {
+        // プレビューオーバーレイを隠す
+        document.getElementById('previewOverlay').style.display = 'none';
+        
+        // タイムライン情報更新
+        document.getElementById('timelineInfo').textContent = 
+            `${this.selectedClip.fileName} - ${this.loopCount}回ループ設定済み`;
+    }
+    
+    renderTimeline() {
+        const timelineTrack = document.getElementById('timelineTrack');
+        
+        if (!timelineTrack) {
+            console.error('❌ Timeline track element not found');
+            return;
+        }
+        
+        console.log(`🎬 Rendering timeline with ${this.timelineClips.length} clips`);
+        
+        const placeholder = timelineTrack.querySelector('.timeline-placeholder');
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+        
+        // 既存のクリップをすべて削除
+        timelineTrack.querySelectorAll('.timeline-clip').forEach(clip => clip.remove());
+        
+        // 総時間を計算
+        const totalSeconds = this.calculateTotalDuration();
+        const trackWidth = timelineTrack.clientWidth - 40; // パディング分を除く
+        
+        let currentTime = 0;
+        
+        this.timelineClips.forEach((clip, index) => {
+            console.log(`🎬 Processing clip ${index}: ${clip.name || clip.fileName}`, {
+                frames: clip.frames?.length,
+                loopCount: clip.loopCount,
+                totalSeconds
+            });
+            
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            const clipTotalFrames = framesPerLoop * clip.loopCount;
+            const clipDuration = clipTotalFrames / 30; // 秒数
+            
+            // 時系列での位置とサイズを計算
+            const startPercent = (currentTime / totalSeconds) * 100;
+            const widthPercent = (clipDuration / totalSeconds) * 100;
+            
+            console.log(`📊 Clip positioning: start=${startPercent.toFixed(1)}%, width=${widthPercent.toFixed(1)}%`);
+            
+            const timelineClip = document.createElement('div');
+            timelineClip.className = 'timeline-clip';
+            timelineClip.dataset.clipId = clip.id;
+            timelineClip.draggable = true;
+            
+            timelineClip.style.left = `${startPercent}%`;
+            timelineClip.style.width = `${widthPercent}%`;
+            timelineClip.style.minWidth = '80px';
+            
+            timelineClip.innerHTML = `
+                <div style="font-size: 10px; font-weight: bold;">${clip.fileName}</div>
+                <div style="font-size: 8px;">Loop: ${clip.loopCount}回</div>
+                <div style="font-size: 8px;">${this.formatTime(clipDuration)}</div>
+            `;
+            
+            // ドラッグ&ドロップイベント
+            this.setupTimelineClipDragAndDrop(timelineClip, index);
+            
+            // クリック選択
+            timelineClip.addEventListener('click', () => {
+                this.selectTimelineClip(index);
+            });
+            
+            timelineTrack.appendChild(timelineClip);
+            console.log(`✅ Added timeline clip to DOM: ${clip.fileName}`);
+            currentTime += clipDuration;
+        });
+        
+        console.log(`🎬 Timeline rendering complete: ${this.timelineClips.length} clips added`);
+        console.log('Final timelineTrack children:', timelineTrack.children.length);
+        
+        // 全体時間の更新
+        this.updateTotalFrames();
+    }
+    
+    setupTimelineClipDragAndDrop(clipElement, clipIndex) {
+        clipElement.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', clipIndex.toString());
+            clipElement.style.opacity = '0.5';
+        });
+        
+        clipElement.addEventListener('dragend', (e) => {
+            clipElement.style.opacity = '1';
+        });
+        
+        clipElement.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+        
+        clipElement.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const dragIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const dropIndex = clipIndex;
+            
+            if (dragIndex !== dropIndex) {
+                // 配列の要素を入れ替え
+                [this.timelineClips[dragIndex], this.timelineClips[dropIndex]] = 
+                [this.timelineClips[dropIndex], this.timelineClips[dragIndex]];
+                
+                this.renderTimeline();
+                console.log(`✅ Moved clip from ${dragIndex} to ${dropIndex}`);
+            }
+        });
+    }
+    
+    selectTimelineClip(index) {
+        // 全クリップの選択状態をリセット
+        this.timelineClips.forEach(clip => clip.selected = false);
+        
+        // 選択状態を設定
+        this.timelineClips[index].selected = true;
+        
+        // 視覚的フィードバック
+        document.querySelectorAll('.timeline-clip').forEach((element, i) => {
+            if (i === index) {
+                element.classList.add('selected');
+            } else {
+                element.classList.remove('selected');
+            }
+        });
+        
+        console.log(`✅ Selected timeline clip: ${this.timelineClips[index].fileName}`);
+    }
+    
+    // 3. リアルタイム調整 - ループ数変更を即座に反映
+    updateLoopSettings() {
+        this.updateTotalFrames();
+        this.showTimelineClip();
+        
+        // 現在再生中なら効果を即座に反映
+        if (this.isPlaying) {
+            if (this.currentFrame >= this.totalFrames) {
+                this.currentFrame = 0;
+            }
+            this.updateFrameInfo();
+        }
+        
+        console.log('⚡ Loop settings updated in real-time');
+    }
+    
+    // 4. 速度曲線エディタ - ドラッグ中もリアルタイム反映
+    setupSpeedCurveEditor() {
+        const point1 = document.getElementById('point1');
+        const point2 = document.getElementById('point2');
+        const svg = document.getElementById('speedCurveSvg');
+        
+        let isDragging = false;
+        let activePoint = null;
+        
+        [point1, point2].forEach(point => {
+            point.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                activePoint = point;
+                e.preventDefault();
+            });
+        });
+        
+        svg.addEventListener('mousemove', (e) => {
+            if (!isDragging || !activePoint) return;
+            
+            const rect = svg.getBoundingClientRect();
+            const y = Math.max(20, Math.min(180, (e.clientY - rect.top) * (200 / rect.height)));
+            
+            activePoint.setAttribute('cy', y);
+            this.updateSpeedCurve(); // リアルタイム反映
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            activePoint = null;
+        });
+        
+        // 初期曲線設定
+        this.updateSpeedCurve();
+    }
+    
+    updateSpeedCurve() {
+        const point1 = document.getElementById('point1');
+        const point2 = document.getElementById('point2');
+        const path = document.getElementById('speedCurvePath');
+        
+        const y1 = parseFloat(point1.getAttribute('cy'));
+        const y2 = parseFloat(point2.getAttribute('cy'));
+        
+        // 直線で更新
+        path.setAttribute('d', `M 20 ${y1} L 280 ${y2}`);
+        
+        // 速度データを生成
+        this.generateSpeedData(y1, y2);
+        
+        console.log('⚡ Speed curve updated in real-time');
+    }
+    
+    generateSpeedData(y1, y2) {
+        const steps = 100;
+        this.speedCurveData = [];
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const y = y1 + (y2 - y1) * t;
+            
+            // Y座標を速度倍率に変換 (180=1.0x, 20=3.0x)
+            const speed = 1.0 + (180 - y) / 80;
+            this.speedCurveData.push(Math.max(0.1, Math.min(3.0, speed)));
+        }
+        
+        console.log(`🎯 Generated ${this.speedCurveData.length} speed curve points`);
+    }
+    
+    resetSpeedCurve() {
+        document.getElementById('point1').setAttribute('cy', '180');
+        document.getElementById('point2').setAttribute('cy', '180');
+        this.updateSpeedCurve();
+    }
+    
+    // 5. ループ再生 - フレームベース実装
+    playLoop() {
+        // 厳密な準備確認
+        if (!this.isSet) {
+            alert('まず動画をセットしてください');
+            return;
+        }
+        
+        if (!this.frames || !this.frames.length) {
+            console.error('❌ No frames available for playback');
+            return;
+        }
+        
+        if (!this.hiddenVideo || this.hiddenVideo.readyState < 3) {
+            console.error('❌ Video not ready for playback');
+            return;
+        }
+        
+        this.isPlaying = true;
+        this.lastFrameTime = performance.now();
+        
+        document.getElementById('playBtn').style.display = 'none';
+        document.getElementById('pauseBtn').style.display = 'inline-block';
+        
+        this.animate();
+        console.log('▶️ Loop playback started');
+    }
+    
+    pauseLoop() {
+        this.isPlaying = false;
+        
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
+        document.getElementById('playBtn').style.display = 'inline-block';
+        document.getElementById('pauseBtn').style.display = 'none';
+        
+        console.log('⏸️ Loop playback paused');
+    }
+    
+    stopLoop() {
+        this.pauseLoop();
+        this.currentFrame = 0;
+        this.drawCurrentFrame();
+        this.updateFrameInfo();
+        
+        console.log('⏹️ Loop playback stopped');
+    }
+    
+    // 6. アニメーションループ - 速度曲線を実際に適用
+    animate() {
+        if (!this.isPlaying) return;
+        
+        const now = performance.now();
+        const deltaTime = now - this.lastFrameTime;
+        
+        // 現在の速度を曲線から取得
+        const progress = this.currentFrame / this.totalFrames;
+        const speedIndex = Math.floor(progress * (this.speedCurveData.length - 1));
+        this.currentSpeed = this.speedCurveData[speedIndex] || 1.0;
+        
+        // 速度を反映したフレーム進行
+        const frameDuration = 1000 / 30 / this.currentSpeed; // 30fps基準
+        
+        if (deltaTime >= frameDuration) {
+            this.currentFrame++;
+            
+            if (this.currentFrame >= this.totalFrames) {
+                this.currentFrame = 0; // ループ
+            }
+            
+            // 非同期処理をブロッキングしないよう、Promiseで実行
+            this.drawCurrentFrame().catch(error => {
+                console.warn('⚠️ Draw error in animation:', error);
+            });
+            this.updateFrameInfo();
+            
+            this.lastFrameTime = now;
+        }
+        
+        this.animationId = requestAnimationFrame(() => this.animate());
+    }
+    
+    async drawCurrentFrame() {
+        // 厳密な存在チェック
+        if (!this.frames || !this.frames.length) {
+            console.warn('⚠️ No frames available');
+            return;
+        }
+        
+        if (!this.canvas || !this.ctx || !this.hiddenVideo) {
+            console.warn('⚠️ Canvas elements not ready');
+            return;
+        }
+        
+        if (this.hiddenVideo.readyState < 2) {
+            console.warn('⚠️ Hidden video not loaded');
+            return;
+        }
+        
+        // 🎬 複数動画結合: 現在のフレームがどの動画クリップに属するか判定
+        const clipInfo = this.getClipInfoForFrame(this.currentFrame);
+        if (!clipInfo) {
+            console.warn('⚠️ No clip found for frame:', this.currentFrame);
+            return;
+        }
+        
+        const { clip, localFrame, isReverse } = clipInfo;
+        
+        // 動画を切り替える必要があるかチェック
+        if (this.currentClipId !== clip.id) {
+            console.log(`🔄 Switching to clip: ${clip.name} (ID: ${clip.id})`);
+            this.hiddenVideo.src = clip.filePath;
+            this.currentClipId = clip.id;
+            
+            // 動画切り替え待機
+            await new Promise((resolve, reject) => {
+                this.hiddenVideo.oncanplaythrough = resolve;
+                this.hiddenVideo.onerror = reject;
+            });
+        }
+        
+        // ローカルフレームから時間を算出
+        const sourceFrameIndex = isReverse ? 
+            (clip.frames.length - 1 - (localFrame % clip.frames.length)) : 
+            (localFrame % clip.frames.length);
+            
+        if (sourceFrameIndex >= clip.frames.length) return;
+        
+        const targetTime = clip.frames[sourceFrameIndex].time;
+        
+        try {
+            // ビデオをシーク（確実な完了待機）
+            if (Math.abs(this.hiddenVideo.currentTime - targetTime) > 0.03) {
+                this.hiddenVideo.currentTime = targetTime;
+                
+                // シーク完了を確実に待機
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        console.warn('⚠️ Seek timeout');
+                        resolve();
+                    }, 100);
+                    
+                    this.hiddenVideo.onseeked = () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    };
+                });
+            }
+            
+            // Canvas描画エラーハンドリング追加
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // 動画サイズチェック
+            if (this.hiddenVideo.videoWidth === 0 || this.hiddenVideo.videoHeight === 0) {
+                console.warn('⚠️ Video dimensions not ready');
+                return;
+            }
+            
+            // アスペクト比維持して描画
+            const videoAspect = this.hiddenVideo.videoWidth / this.hiddenVideo.videoHeight;
+            const canvasAspect = this.canvas.width / this.canvas.height;
+            
+            let drawWidth, drawHeight, drawX, drawY;
+            
+            if (videoAspect > canvasAspect) {
+                drawWidth = this.canvas.width;
+                drawHeight = drawWidth / videoAspect;
+                drawX = 0;
+                drawY = (this.canvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = this.canvas.height;
+                drawWidth = drawHeight * videoAspect;
+                drawX = (this.canvas.width - drawWidth) / 2;
+                drawY = 0;
+            }
+            
+            this.ctx.drawImage(this.hiddenVideo, drawX, drawY, drawWidth, drawHeight);
+            console.log(`🎨 Frame drawn: Clip(${clip.name}) Frame(${sourceFrameIndex}/${clip.frames.length}) Global(${this.currentFrame}/${this.totalFrames})`);
+            
+        } catch (error) {
+            console.error('❌ Draw error:', error);
+        }
+    }
+    
+    getSegmentInfoForFrame(frameNum) {
+        const forwardFrames = this.frames.length;
+        const reverseFrames = this.frames.length - 1;
+        const segmentPairFrames = forwardFrames + reverseFrames;
+        
+        const loopIndex = Math.floor(frameNum / segmentPairFrames);
+        const frameInLoop = frameNum % segmentPairFrames;
+        
+        let sourceFrame;
+        let isReverse;
+        
+        if (frameInLoop < forwardFrames) {
+            // 正再生
+            sourceFrame = frameInLoop;
+            isReverse = false;
+        } else {
+            // 逆再生
+            const reverseIndex = frameInLoop - forwardFrames;
+            sourceFrame = forwardFrames - 1 - reverseIndex;
+            isReverse = true;
+        }
+        
+        return { sourceFrame, isReverse, loopIndex };
+    }
+    
+    // 🎬 複数動画結合: 現在のフレームがどの動画クリップに属するかを判定
+    getClipInfoForFrame(globalFrame) {
+        if (!this.timelineClips || this.timelineClips.length === 0) {
+            console.warn('⚠️ No timeline clips available');
+            return null;
+        }
+        
+        let currentFrame = 0;
+        
+        for (const clip of this.timelineClips) {
+            // このクリップの総フレーム数（ループ考慮）
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            const clipTotalFrames = framesPerLoop * clip.loopCount;
+            
+            // グローバルフレームがこのクリップの範囲内か？
+            if (globalFrame >= currentFrame && globalFrame < currentFrame + clipTotalFrames) {
+                const localFrame = globalFrame - currentFrame;
+                const loopIndex = Math.floor(localFrame / framesPerLoop);
+                const frameInLoop = localFrame % framesPerLoop;
+                
+                const isReverse = frameInLoop >= forwardFrames;
+                
+                return {
+                    clip,
+                    localFrame: frameInLoop,
+                    isReverse,
+                    loopIndex
+                };
+            }
+            
+            currentFrame += clipTotalFrames;
+        }
+        
+        console.warn(`⚠️ Frame ${globalFrame} not found in any clip`);
+        return null;
+    }
+    
+    updateFrameInfo() {
+        const segmentInfo = this.getSegmentInfoForFrame(this.currentFrame);
+        
+        document.getElementById('currentFrame').textContent = this.currentFrame;
+        document.getElementById('currentLoop').textContent = segmentInfo.loopIndex + 1;
+        
+        // シークバー更新
+        const progress = this.currentFrame / this.totalFrames;
+        document.getElementById('seekbarProgress').style.width = `${progress * 100}%`;
+        document.getElementById('seekbarThumb').style.left = `${progress * 100}%`;
+        
+        // タイムラインシークバー更新
+        const timelineSeekbar = document.getElementById('timelineSeekbar');
+        if (timelineSeekbar && this.totalFrames > 0) {
+            timelineSeekbar.value = (this.currentFrame / (this.totalFrames - 1)) * 100;
+        }
+        
+        // プレイヘッドとタイム表示を更新
+        this.updatePlayhead();
+        this.updateTimeDisplay();
+        
+        // 時間表示 + 現在の速度表示
+        const currentSeconds = (this.currentFrame / 30);
+        const totalSeconds = (this.totalFrames / 30);
+        document.getElementById('timeDisplay').textContent = 
+            `${this.formatTime(currentSeconds)} / ${this.formatTime(totalSeconds)} (${this.currentSpeed.toFixed(1)}x)`;
     }
     
     formatTime(seconds) {
@@ -581,157 +877,408 @@ class LOOOOPApp {
         return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
     
+    // シークバー機能
+    setupSeekbar() {
+        const seekbarTrack = document.getElementById('seekbarTrack');
+        const seekbarThumb = document.getElementById('seekbarThumb');
+        
+        let isDragging = false;
+        
+        // クリック・ドラッグでシーク
+        seekbarTrack.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            this.handleSeek(e);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                this.handleSeek(e);
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    }
+    
+    handleSeek(e) {
+        if (!this.isSet || this.timelineClips.length === 0) return;
+        
+        const seekbarTrack = document.getElementById('seekbarTrack');
+        const rect = seekbarTrack.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        
+        // 総フレーム数を取得
+        const totalFrames = this.calculateTotalFrames();
+        this.currentFrame = Math.floor(percent * totalFrames);
+        
+        // プレビュー更新
+        this.drawCurrentFrame();
+        this.updateFrameInfo();
+        
+        console.log(`🎯 Seeked to frame: ${this.currentFrame}/${totalFrames}`);
+    }
+    
+    setupTimelineSeekbar() {
+        const timelineSeekbar = document.getElementById('timelineSeekbar');
+        if (!timelineSeekbar) return;
+        
+        timelineSeekbar.addEventListener('input', (e) => {
+            if (this.totalFrames <= 0) return;
+            
+            const progress = e.target.value / 100;
+            this.currentFrame = Math.floor(progress * (this.totalFrames - 1));
+            this.drawCurrentFrame();
+            this.updateFrameInfo();
+            this.updatePlayhead();
+            this.updateTimeDisplay();
+            
+            console.log(`🎯 Timeline seeked to frame: ${this.currentFrame}/${this.totalFrames}`);
+        });
+        
+        timelineSeekbar.addEventListener('change', (e) => {
+            if (this.totalFrames <= 0) return;
+            
+            const progress = e.target.value / 100;
+            this.currentFrame = Math.floor(progress * (this.totalFrames - 1));
+            this.drawCurrentFrame();
+            this.updateFrameInfo();
+            this.updatePlayhead();
+            this.updateTimeDisplay();
+        });
+    }
+    
+    updatePlayhead() {
+        const playhead = document.getElementById('playhead');
+        const timelineTrack = document.getElementById('timelineTrack');
+        
+        if (!playhead || !timelineTrack || this.totalFrames <= 0) return;
+        
+        const progress = this.currentFrame / (this.totalFrames - 1);
+        const trackWidth = timelineTrack.offsetWidth - 30; // padding考慮
+        const position = progress * trackWidth;
+        
+        playhead.style.left = `${position + 15}px`;
+    }
+    
+    updateTimeDisplay() {
+        const currentTime = this.totalFrames > 0 ? (this.currentFrame / 30).toFixed(1) : '0.0';
+        const totalTime = this.totalFrames > 0 ? ((this.totalFrames - 1) / 30).toFixed(1) : '0.0';
+        
+        const currentDisplay = document.getElementById('currentTimeDisplay');
+        const totalDisplay = document.getElementById('totalTimeDisplay');
+        
+        if (currentDisplay) currentDisplay.textContent = `${currentTime}s`;
+        if (totalDisplay) totalDisplay.textContent = `${totalTime}s`;
+    }
+    
+    calculateTotalFrames() {
+        return this.timelineClips.reduce((total, clip) => {
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            return total + (framesPerLoop * clip.loopCount);
+        }, 0);
+    }
+    
+    // キーボードショートカット
     handleKeyboardShortcut(e) {
+        // Ctrl+キーの組み合わせ
         if (e.ctrlKey || e.metaKey) {
-            switch (e.key) {
-                case 's':
-                    e.preventDefault();
-                    this.saveProject();
-                    break;
-                case 'e':
-                    e.preventDefault();
-                    this.showModal('exportModal');
-                    break;
+            switch (e.key.toLowerCase()) {
                 case 'i':
                     e.preventDefault();
                     this.importVideos();
                     break;
+                case 's':
+                    e.preventDefault();
+                    this.setToTimeline();
+                    break;
+                case 'r':
+                    e.preventDefault();
+                    this.resetSpeedCurve();
+                    break;
+                case 'delete':
+                case 'backspace':
+                    e.preventDefault();
+                    this.deleteSelectedTimelineClip();
+                    break;
             }
-        } else if (e.key === ' ') {
-            e.preventDefault();
-            if (this.isPlaying) {
-                this.pauseVideo();
-            } else {
-                this.playVideo();
-            }
-        }
-    }
-    
-    newProject() {
-        this.project = {
-            name: 'Untitled Project',
-            timeline: [],
-            settings: {
-                resolution: '1920x1080',
-                bitrate: 10000000,
-                fps: 30
-            }
-        };
-        this.currentFilePath = null;
-        this.clearUI();
-        console.log('New project created');
-    }
-    
-    async saveProject() {
-        if (window.electronAPI) {
-            try {
-                const filePath = await window.electronAPI.saveProject(this.project, this.currentFilePath);
-                if (filePath) {
-                    this.currentFilePath = filePath;
-                    console.log(`Project saved to: ${filePath}`);
-                }
-            } catch (error) {
-                console.error('Failed to save project:', error);
-            }
-        }
-    }
-    
-    async openProject(filePath) {
-        if (window.electronAPI) {
-            try {
-                const projectData = await window.electronAPI.loadProject(filePath);
-                if (projectData) {
-                    this.project = projectData;
-                    this.currentFilePath = filePath;
-                    this.loadProjectToUI();
-                    console.log(`Project loaded from: ${filePath}`);
-                }
-            } catch (error) {
-                console.error('Failed to load project:', error);
+        } 
+        // 単独キー
+        else {
+            switch (e.key) {
+                case ' ': // スペースキー
+                    e.preventDefault();
+                    if (this.isPlaying) {
+                        this.pauseLoop();
+                    } else {
+                        this.playLoop();
+                    }
+                    break;
+                case 'Escape':
+                    this.stopLoop();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    this.seekFrames(-1);
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    this.seekFrames(1);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.adjustLoopCount(1);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    this.adjustLoopCount(-1);
+                    break;
             }
         }
     }
     
-    loadProjectToUI() {
-        // UIにプロジェクトデータを反映
-        console.log('Loading project to UI...');
-        // TODO: タイムラインの復元など
+    seekFrames(delta) {
+        if (!this.isSet) return;
+        
+        const totalFrames = this.calculateTotalFrames();
+        this.currentFrame = Math.max(0, Math.min(totalFrames - 1, this.currentFrame + delta));
+        
+        this.drawCurrentFrame();
+        this.updateFrameInfo();
     }
     
-    clearUI() {
-        // UIをクリア
-        const mediaPool = document.getElementById('mediaPool');
-        const clips = mediaPool.querySelectorAll('.media-clip');
-        clips.forEach(clip => clip.remove());
-        
-        const video = document.getElementById('previewVideo');
-        video.src = '';
-        document.getElementById('previewOverlay').style.display = 'flex';
-        
-        console.log('UI cleared');
+    adjustLoopCount(delta) {
+        const newCount = Math.max(1, Math.min(99, this.loopCount + delta));
+        if (newCount !== this.loopCount) {
+            this.loopCount = newCount;
+            document.getElementById('loopCount').value = this.loopCount;
+            
+            if (this.isSet) {
+                this.updateLoopSettings();
+            }
+        }
     }
     
-    showModal(modalId) {
-        document.getElementById(modalId).style.display = 'flex';
-    }
-    
-    hideModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
-    }
-    
-    startExport() {
-        const fileName = document.getElementById('fileName').value;
-        const resolution = document.getElementById('resolution').value;
-        const bitrate = parseInt(document.getElementById('bitrate').value);
-        const fps = parseInt(document.getElementById('fps').value);
-        
-        console.log('Export started:', { fileName, resolution, bitrate, fps });
-        
-        // プログレス表示
-        document.getElementById('progressSection').style.display = 'block';
-        document.getElementById('startExport').disabled = true;
-        
-        // TODO: 実際のエクスポート処理
-        this.simulateExport();
-    }
-    
-    simulateExport() {
-        let progress = 0;
-        const progressFill = document.getElementById('progressFill');
-        const progressText = document.getElementById('progressText');
-        
-        const interval = setInterval(() => {
-            progress += Math.random() * 10;
-            if (progress >= 100) {
-                progress = 100;
-                clearInterval(interval);
-                progressText.textContent = 'エクスポート完了！';
-                setTimeout(() => {
-                    this.hideModal('exportModal');
-                    this.resetExportModal();
-                }, 2000);
-            } else {
-                progressText.textContent = `処理中... ${Math.round(progress)}%`;
+    deleteSelectedTimelineClip() {
+        const selectedIndex = this.timelineClips.findIndex(clip => clip.selected);
+        if (selectedIndex !== -1) {
+            this.timelineClips.splice(selectedIndex, 1);
+            this.renderTimeline();
+            
+            if (this.timelineClips.length === 0) {
+                this.isSet = false;
+                document.getElementById('previewOverlay').style.display = 'flex';
             }
             
-            progressFill.style.width = `${progress}%`;
-        }, 200);
+            console.log('🗑️ Deleted selected timeline clip');
+        }
     }
     
-    resetExportModal() {
-        document.getElementById('progressSection').style.display = 'none';
-        document.getElementById('progressFill').style.width = '0%';
-        document.getElementById('startExport').disabled = false;
+    // 🚀 新しい速度パターンシステム
+    setupNewSpeedEditor() {
+        const speedPreset = document.getElementById('speedPreset');
+        const customControls = document.getElementById('customSpeedControls');
+        const applyButton = document.getElementById('applySpeedCurve');
+        
+        if (!speedPreset) return;
+        
+        // プリセット選択イベント
+        speedPreset.addEventListener('change', (e) => {
+            const preset = e.target.value;
+            
+            if (preset === 'custom') {
+                customControls.style.display = 'block';
+            } else {
+                customControls.style.display = 'none';
+                this.applySpeedPreset(preset);
+            }
+        });
+        
+        // カスタムスライダーイベント
+        ['startSpeedSlider', 'midSpeedSlider', 'endSpeedSlider'].forEach(id => {
+            const slider = document.getElementById(id);
+            const valueSpan = document.getElementById(id.replace('Slider', 'Value'));
+            
+            if (slider && valueSpan) {
+                slider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    valueSpan.textContent = `${value.toFixed(1)}x`;
+                    this.updateSpeedPreview();
+                });
+            }
+        });
+        
+        // 適用ボタン
+        if (applyButton) {
+            applyButton.addEventListener('click', () => {
+                this.applyCustomSpeedCurve();
+            });
+        }
+        
+        // 初期プレビュー
+        this.updateSpeedPreview();
+    }
+    
+    initializeNewSpeedSystem() {
+        // スピードデータを初期化
+        this.currentSpeedPreset = 'linear';
+        this.speedCurveData = this.generateLinearSpeedCurve();
+        
+        console.log('🎯 New speed system initialized');
+    }
+    
+    applySpeedPreset(preset) {
+        switch (preset) {
+            case 'linear':
+                this.speedCurveData = this.generateLinearSpeedCurve();
+                break;
+            case 'easeIn':
+                this.speedCurveData = this.generateEaseInCurve();
+                break;
+            case 'easeOut':
+                this.speedCurveData = this.generateEaseOutCurve();
+                break;
+            case 'easeInOut':
+                this.speedCurveData = this.generateEaseInOutCurve();
+                break;
+            case 'bounce':
+                this.speedCurveData = this.generateBounceCurve();
+                break;
+        }
+        
+        this.updateSpeedPreview();
+        console.log(`⚡ Applied speed preset: ${preset}`);
+    }
+    
+    generateLinearSpeedCurve() {
+        return Array(101).fill(1.0);
+    }
+    
+    generateEaseInCurve() {
+        const curve = [];
+        for (let i = 0; i <= 100; i++) {
+            const t = i / 100;
+            curve.push(0.3 + (t * t) * 2.7); // 0.3x から 3.0x へ
+        }
+        return curve;
+    }
+    
+    generateEaseOutCurve() {
+        const curve = [];
+        for (let i = 0; i <= 100; i++) {
+            const t = i / 100;
+            curve.push(3.0 - (t * t) * 2.7); // 3.0x から 0.3x へ
+        }
+        return curve;
+    }
+    
+    generateEaseInOutCurve() {
+        const curve = [];
+        for (let i = 0; i <= 100; i++) {
+            const t = i / 100;
+            if (t < 0.5) {
+                curve.push(0.5 + (2 * t * t) * 2.0); // スロースタート
+            } else {
+                const t2 = 1 - t;
+                curve.push(0.5 + (2 * t2 * t2) * 2.0); // スローフィニッシュ
+            }
+        }
+        return curve;
+    }
+    
+    generateBounceCurve() {
+        const curve = [];
+        for (let i = 0; i <= 100; i++) {
+            const t = i / 100;
+            const bounce = Math.abs(Math.sin(t * Math.PI * 3)) * 1.5 + 0.5;
+            curve.push(Math.min(3.0, bounce));
+        }
+        return curve;
+    }
+    
+    applyCustomSpeedCurve() {
+        const startSpeed = parseFloat(document.getElementById('startSpeedSlider').value);
+        const midSpeed = parseFloat(document.getElementById('midSpeedSlider').value);
+        const endSpeed = parseFloat(document.getElementById('endSpeedSlider').value);
+        
+        this.speedCurveData = [];
+        
+        for (let i = 0; i <= 100; i++) {
+            const t = i / 100;
+            let speed;
+            
+            if (t <= 0.5) {
+                // 開始から中間
+                speed = startSpeed + (midSpeed - startSpeed) * (t * 2);
+            } else {
+                // 中間から終了
+                speed = midSpeed + (endSpeed - midSpeed) * ((t - 0.5) * 2);
+            }
+            
+            this.speedCurveData.push(Math.max(0.1, Math.min(3.0, speed)));
+        }
+        
+        this.updateSpeedPreview();
+        console.log('⚡ Applied custom speed curve');
+    }
+    
+    updateSpeedPreview() {
+        const canvas = document.getElementById('speedPreviewCanvas');
+        if (!canvas) return;
+        
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        
+        // 背景をクリア
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, width, height);
+        
+        // グリッド
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const y = (height / 4) * i;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(width, y);
+            ctx.stroke();
+        }
+        
+        // 速度曲線を描画
+        if (this.speedCurveData && this.speedCurveData.length > 0) {
+            ctx.strokeStyle = '#4CAF50';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < this.speedCurveData.length; i++) {
+                const x = (i / (this.speedCurveData.length - 1)) * width;
+                const speed = this.speedCurveData[i];
+                const y = height - ((speed - 0.1) / 2.9) * height; // 0.1-3.0の範囲をcanvas高さにマッピング
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+        }
+        
+        // 速度値ラベル
+        ctx.fillStyle = '#ccc';
+        ctx.font = '10px Arial';
+        ctx.fillText('3.0x', 5, 12);
+        ctx.fillText('2.0x', 5, height/2);
+        ctx.fillText('1.0x', 5, height - 5);
     }
 }
 
 // アプリケーション開始
 document.addEventListener('DOMContentLoaded', () => {
     window.loooopApp = new LOOOOPApp();
-    
-    // ビデオの時間更新
-    const video = document.getElementById('previewVideo');
-    video.addEventListener('timeupdate', () => {
-        window.loooopApp.updateTimeDisplay();
-    });
+    console.log('🚀 LOOOOP App started - Real-time implementation ready!');
 });
