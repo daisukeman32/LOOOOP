@@ -142,13 +142,12 @@
             <!-- 統合された速度曲線エディタ（詳細制御） -->
             <div class="speed-curve-editor">
                 <div class="speed-curve-header">
-                    <h4>速度曲線エディタ（詳細制御）</h4>
+                    <h4>速度曲線エディタ（リアルタイム制御）</h4>
                     <div class="speed-curve-help">
-                        Left Click: 支点追加 | Right Click: 支点削除 | Drag: 位置調整
+                        Left Click: 支点追加 | Right Click: 支点削除 | Drag: 位置調整 | 変更は即座に反映
                     </div>
                     <div class="speed-curve-buttons">
                         <button class="reset-button" id="resetSpeedCurveWide">リセット</button>
-                        <button class="apply-button" id="applySpeedCurveWide">適用</button>
                     </div>
                 </div>
             <canvas id="speedCurveCanvas" width="800" height="200" style="
@@ -161,40 +160,6 @@
                 display: block;
             "></canvas>
             
-            <!-- ワイド版精密制御パネル -->
-            <div class="curve-precision-panel-wide">
-                <div class="precision-info-wide">
-                    <span class="precision-label-wide">精密制御:</span>
-                    <div class="precision-values-wide">
-                        <div class="value-item-wide">
-                            <label>P0:</label>
-                            <input type="number" id="p0SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                            <span>x</span>
-                        </div>
-                        <div class="value-item-wide">
-                            <label>P1:</label>
-                            <input type="number" id="p1SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                            <span>x</span>
-                        </div>
-                        <div class="value-item-wide">
-                            <label>P2:</label>
-                            <input type="number" id="p2SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                            <span>x</span>
-                        </div>
-                        <div class="value-item-wide">
-                            <label>P3:</label>
-                            <input type="number" id="p3SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                            <span>x</span>
-                        </div>
-                        <div class="value-item-wide">
-                            <label>P4:</label>
-                            <input type="number" id="p4SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                            <span>x</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             </div> <!-- timeline-panel 終了 -->
         </div> <!-- main content wrapper 終了 -->
     </div>
@@ -202,6 +167,7 @@
     <!-- ファイル入力（非表示） -->
     <input type="file" id="fileInput" accept="video/*" style="display: none;" multiple>
     
+    <script src="loopEngine.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

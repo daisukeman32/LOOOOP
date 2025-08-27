@@ -89,6 +89,9 @@ class LOOOOPApp {
         
         this.ctx = this.canvas.getContext('2d');
         
+        // LoopEngineを初期化
+        this.initializeLoopEngine();
+        
         // Canvas初期設定
         this.canvas.width = 640;
         this.canvas.height = 360;
@@ -101,6 +104,40 @@ class LOOOOPApp {
         }
         
         console.log('Elements initialized');
+    }
+    
+    // LoopEngineを初期化
+    initializeLoopEngine() {
+        // LoopEngine.jsをインポート（ESモジュールではないので、グローバルスコープから使用）
+        if (typeof LoopEngine !== 'undefined') {
+            this.loopEngine = new LoopEngine(this.canvas, this.hiddenVideo);
+            console.log('✅ LoopEngine initialized successfully');
+            
+            // LoopEngineのコールバック設定
+            this.loopEngine.onFrameUpdate = (currentFrame, totalFrames) => {
+                this.onLoopEngineFrameUpdate(currentFrame, totalFrames);
+            };
+            
+            this.loopEngine.onPlaybackEnd = () => {
+                this.onLoopEnginePlaybackEnd();
+            };
+        } else {
+            console.error('❌ LoopEngine class not found - loopEngine.js not loaded?');
+        }
+    }
+    
+    // LoopEngineからのフレーム更新コールバック
+    onLoopEngineFrameUpdate(currentFrame, totalFrames) {
+        // UI更新
+        this.currentFrame = currentFrame;
+        this.updateFrameInfo(); // フレーム情報更新
+        this.updatePlayhead(); // タイムラインの再生ヘッド更新
+    }
+    
+    // LoopEngineからの再生終了コールバック
+    onLoopEnginePlaybackEnd() {
+        console.log('🔄 Loop playback completed');
+        // 必要に応じて追加処理
     }
     
     setupEventListeners() {
@@ -384,6 +421,18 @@ class LOOOOPApp {
             // UI更新
             this.updateUI();
             this.renderTimeline();
+            
+            // LoopEngineに動画を読み込み
+            if (this.loopEngine && this.selectedClip) {
+                try {
+                    const videoPath = this.selectedClip.filePath || this.selectedClip.path;
+                    console.log('🔄 Loading video into LoopEngine:', videoPath);
+                    await this.loopEngine.loadVideo(videoPath);
+                    console.log('✅ Video loaded into LoopEngine');
+                } catch (error) {
+                    console.warn('⚠️ Failed to load video into LoopEngine:', error);
+                }
+            }
             
             // 実際の再生時間を計算して表示
             this.updateActualDurationDisplay();
@@ -1359,37 +1408,67 @@ class LOOOOPApp {
             return;
         }
         
-        this.isPlaying = true;
-        this.lastFrameTime = performance.now();
+        // LoopEngineを使用した再生
+        if (this.loopEngine && this.loopEngine.frames && this.loopEngine.frames.length > 0) {
+            // LoopEngineにデータを設定
+            this.loopEngine.setLoopCount(this.loopCount);
+            
+            // LoopEngineで再生開始
+            this.loopEngine.play();
+            this.isPlaying = true;
+            
+            console.log('▶️ Loop playback started via LoopEngine');
+        } else if (this.frames && this.frames.length > 0) {
+            // フォールバック: 従来のアニメーション（従来のフレームシステム使用）
+            this.isPlaying = true;
+            this.lastFrameTime = performance.now();
+            this.animate();
+            
+            console.log('▶️ Loop playback started via fallback animation');
+        } else {
+            console.error('❌ No frames available for playback in either LoopEngine or fallback system');
+            alert('動画データがありません。再度セットしてください。');
+            return;
+        }
         
         document.getElementById('playBtn').style.display = 'none';
         document.getElementById('pauseBtn').style.display = 'inline-block';
-        
-        this.animate();
-        console.log('▶️ Loop playback started');
     }
     
     pauseLoop() {
         this.isPlaying = false;
         
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = null;
+        // LoopEngine使用時
+        if (this.loopEngine) {
+            this.loopEngine.pause();
+            console.log('⏸️ Loop playback paused via LoopEngine');
+        } else {
+            // フォールバック
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+            console.log('⏸️ Loop playback paused via fallback');
         }
         
         document.getElementById('playBtn').style.display = 'inline-block';
         document.getElementById('pauseBtn').style.display = 'none';
-        
-        console.log('⏸️ Loop playback paused');
     }
     
     stopLoop() {
         this.pauseLoop();
-        this.currentFrame = 0;
-        this.drawCurrentFrame();
-        this.updateFrameInfo();
         
-        console.log('⏹️ Loop playback stopped');
+        // LoopEngine使用時
+        if (this.loopEngine) {
+            this.loopEngine.stop();
+            console.log('⏹️ Loop playback stopped via LoopEngine');
+        } else {
+            // フォールバック
+            this.currentFrame = 0;
+            this.drawCurrentFrame();
+            this.updateFrameInfo();
+            console.log('⏹️ Loop playback stopped via fallback');
+        }
     }
     
     // 6. アニメーションループ - 速度曲線を実際に適用
@@ -2494,20 +2573,12 @@ class LOOOOPApp {
     
     initializeCurveButtonsWide() {
         const resetButton = document.getElementById('resetSpeedCurveWide');
-        const applyButton = document.getElementById('applySpeedCurveWide');
         
         if (resetButton) {
             resetButton.addEventListener('click', () => {
                 this.resetSpeedCurveWide();
                 this.updateActualDurationDisplay(); // リセット後の時間を再計算
-            });
-        }
-        
-        if (applyButton) {
-            applyButton.addEventListener('click', () => {
-                this.applySpeedCurveToEngine(); // LoopEngineに速度曲線を適用
-                this.updateActualDurationDisplay(); // 実際の再生時間を再計算
-                console.log('🎯 Wide speed curve applied to playback system');
+                console.log('🔄 Speed curve reset - automatically applied to playback');
             });
         }
     }

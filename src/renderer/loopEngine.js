@@ -286,4 +286,5 @@ class LoopEngine {
     }
 }
 
-export default LoopEngine;
+// LoopEngineをグローバルスコープで利用可能にする
+window.LoopEngine = LoopEngine;
