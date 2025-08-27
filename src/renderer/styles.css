@@ -716,7 +716,7 @@ body {
     width: 100%;
     padding: 6px 8px;
     background-color: var(--bg-tertiary);
-    color: white;
+    color: var(--text-primary);
     border: 1px solid var(--border-primary);
     border-radius: 4px;
     font-size: 14px;
@@ -731,7 +731,7 @@ body {
 .reset-button, .set-button {
     width: 100%;
     background-color: var(--hover-bg);
-    color: white;
+    color: var(--text-primary);
     border: none;
     padding: 6px;
     border-radius: 4px;
@@ -765,11 +765,30 @@ body {
     border-bottom: 1px solid var(--border-primary);
     border-radius: 0;
     margin: 0 16px 16px 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-primary) var(--bg-secondary);
+}
+
+.timeline-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.timeline-panel::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.timeline-panel::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 4px;
+}
+
+.timeline-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color);
 }
 
 @media (max-height: 800px) {
@@ -828,7 +847,7 @@ body {
 .control-btn:hover {
     background: linear-gradient(180deg, var(--border-primary) 0%, var(--bg-tertiary) 100%);
     border-color: var(--border-primary);
-    color: white;
+    color: var(--text-primary);
 }
 
 .control-btn:active {
@@ -901,17 +920,445 @@ body {
     color: #007acc;
 }
 
-/* Premiere Pro風タイムライン定規 */
-.timeline-ruler {
-    height: 24px;
-    background: linear-gradient(180deg, #333 0%, #2a2a2a 100%);
-    border-bottom: 1px solid #1a1a1a;
-    border-top: 1px solid #3a3a3a;
-    position: relative;
-    margin: 0;
-    font-size: 10px;
-    color: #aaa;
+/* ==========================================
+   Adobe Premiere Pro風プロフェッショナルタイムライン
+   ========================================== */
+
+.professional-timeline {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-primary);
+    border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-height: 200px;
+}
+
+/* 時間軸ルーラー */
+.timeline-ruler {
+    height: 32px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    border-bottom: 1px solid #0f0f0f;
+    position: relative;
+    overflow: hidden;
+}
+
+.ruler-scale {
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+}
+
+/* メイントラック */
+.main-track-container {
+    position: relative;
+    height: 120px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* 速度曲線背景 */
+.speed-curve-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    opacity: 0.3;
+}
+
+#miniSpeedCurve {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* クリップトラック */
+.clip-track {
+    position: relative;
+    height: 100%;
+    z-index: 2;
+}
+
+.track-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.placeholder-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.placeholder-icon {
+    font-size: 24px;
+}
+
+.placeholder-text {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* クリップコンテナ */
+.clips-container {
+    position: relative;
+    height: 100%;
+    z-index: 3;
+}
+
+/* プレイヘッド */
+.playhead-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.playhead-line {
+    width: 2px;
+    height: 100%;
+    background: #ef4444;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+    pointer-events: none;
+}
+
+.playhead-handle {
+    position: absolute;
+    top: -8px;
+    left: -6px;
+    width: 14px;
+    height: 16px;
+    cursor: ew-resize;
+    pointer-events: all;
+}
+
+.playhead-triangle {
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 12px solid #ef4444;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* 選択範囲 */
+.selection-overlay {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: rgba(59, 130, 246, 0.2);
+    border: 2px solid #3b82f6;
+    border-radius: 4px;
+    z-index: 5;
+    display: none;
+}
+
+/* タイムライン情報バー */
+.timeline-info-bar {
+    height: 36px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+    border-top: 1px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+}
+
+.timeline-stats {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.time-display {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.timeline-zoom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.zoom-btn {
+    width: 24px;
+    height: 24px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: 4px;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.zoom-btn:hover {
+    background: var(--hover-bg);
+    border-color: var(--accent-color);
+}
+
+.zoom-level {
+    color: var(--text-secondary);
+    font-size: 12px;
+    min-width: 40px;
+    text-align: center;
+}
+
+/* ==========================================
+   タイムラインクリップ（ドラッグ&ドロップ対応）
+   ========================================== */
+
+.timeline-clip {
+    position: absolute;
+    height: 80px;
+    top: 20px;
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    border: 1px solid #1e40af;
+    border-radius: 6px;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    z-index: 4;
+}
+
+.timeline-clip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.timeline-clip.selected {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 2px #fbbf24, 0 4px 16px rgba(251, 191, 36, 0.3);
+}
+
+.timeline-clip.dragging {
+    transform: rotate(5deg) scale(1.05);
+    z-index: 20;
+    opacity: 0.8;
+}
+
+/* クリップ内容 */
+.clip-content {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    width: 100%;
+    height: 100%;
+}
+
+.clip-thumbnail {
+    width: 48px;
+    height: 32px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    margin-right: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.clip-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.clip-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.clip-name {
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.clip-duration {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 9px;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+/* リサイズハンドル */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: transparent;
+    cursor: ew-resize;
+    z-index: 5;
+}
+
+.resize-handle.left {
+    left: 0;
+}
+
+.resize-handle.right {
+    right: 0;
+}
+
+.resize-handle:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ドロップゾーン */
+.drop-zone {
+    position: absolute;
+    height: 4px;
+    background: #10b981;
+    border-radius: 2px;
+    z-index: 15;
+    display: none;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.drop-zone.active {
+    display: block;
+}
+
+/* アニメーション効果 */
+@keyframes clipInsert {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.timeline-clip.inserting {
+    animation: clipInsert 0.3s ease-out;
+}
+
+/* ==========================================
+   タイムラインシークバー（メインコントロール）
+   ========================================== */
+
+.timeline-seekbar-container {
+    position: relative;
+    height: 40px;
+    background: linear-gradient(180deg, #0f0f0f 0%, #1a1a1a 100%);
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #0a0a0a;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+}
+
+.timeline-seekbar {
+    width: 100%;
+    height: 6px;
+    background: transparent;
+    outline: none;
+    border: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    z-index: 2;
+    position: relative;
+}
+
+.timeline-seekbar::-webkit-slider-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 1px solid #0f0f0f;
+    border-radius: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.timeline-seekbar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 2px solid var(--border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 
+        0 2px 6px rgba(0, 0, 0, 0.3),
+        0 0 0 2px rgba(239, 68, 68, 0.2);
+    transition: all 0.2s ease;
+}
+
+.timeline-seekbar::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 0 4px rgba(239, 68, 68, 0.3);
+}
+
+.timeline-seekbar::-moz-range-track {
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, #2a2a2a 0%, #1a1a1a 100%);
+    border: 1px solid #0f0f0f;
+    border-radius: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.timeline-seekbar::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 2px solid var(--border-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.seekbar-progress {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    height: 6px;
+    background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
+    border-radius: 3px;
+    transform: translateY(-50%);
+    z-index: 1;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    transition: width 0.1s ease;
 }
 
 .ruler-markers {
@@ -1087,7 +1534,7 @@ body {
     align-items: center;
     justify-content: flex-start;
     cursor: grab;
-    color: white;
+    color: var(--text-primary);
     font-size: 11px;
     font-weight: 500;
     min-width: 60px;
@@ -1192,7 +1639,7 @@ body {
     r: 12;
     fill: #4CAF50;
     stroke-width: 4;
-    stroke: #ffffff;
+    stroke: var(--border-primary);
     filter: drop-shadow(0 4px 12px rgba(76, 175, 80, 0.8));
 }
 
@@ -1212,7 +1659,7 @@ body {
     r: 12;
     fill: #ff4757;
     stroke-width: 4;
-    stroke: #ffffff;
+    stroke: var(--border-primary);
     filter: drop-shadow(0 4px 12px rgba(255, 71, 87, 0.8));
 }
 
@@ -1263,7 +1710,7 @@ body {
     width: 45px;
     padding: 3px 5px;
     background: #1a1a1a;
-    color: #fff;
+    color: var(--text-primary);
     border: 1px solid var(--border-primary);
     border-radius: 3px;
     font-size: 10px;
@@ -1311,14 +1758,14 @@ body {
 
 .reset-button:hover {
     background: linear-gradient(135deg, #777 0%, #666 100%);
-    color: #fff;
+    color: var(--text-primary);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .apply-button {
     background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
+    color: var(--text-primary);
     border: 1px solid #45a049;
 }
 
@@ -1477,7 +1924,7 @@ body {
     r: 10;
     fill: #4CAF50;
     stroke-width: 3;
-    stroke: #ffffff;
+    stroke: var(--border-primary);
     filter: drop-shadow(0 4px 12px rgba(76, 175, 80, 0.8));
 }
 
@@ -1496,7 +1943,7 @@ body {
     r: 10;
     fill: #ff4757;
     stroke-width: 3;
-    stroke: #ffffff;
+    stroke: var(--border-primary);
     filter: drop-shadow(0 4px 12px rgba(255, 71, 87, 0.8));
 }
 
@@ -1548,7 +1995,7 @@ body {
     width: 55px;
     padding: 2px 4px;
     background: #1a1a1a;
-    color: #fff;
+    color: var(--text-primary);
     border: 1px solid var(--border-primary);
     border-radius: 3px;
     font-size: 10px;

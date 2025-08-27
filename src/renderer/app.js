@@ -39,6 +39,7 @@ class LOOOOPApp {
     init() {
         this.initializeElements();
         this.setupEventListeners();
+        this.setupPlayheadDrag();
         this.setupSpeedCurveEditor();
         this.setupSpeedCurveEditorWide();
         this.initializeNewSpeedSystem();
@@ -400,20 +401,31 @@ class LOOOOPApp {
             this.timelineClips.push(timelineClip);
             this.isSet = true;
             
-            // ⚡ 重要: 最初のクリップのframesを一時的に設定（後で複数クリップ対応に変更）
-            this.frames = frameData.frames;
-            this.selectedTimelineClip = timelineClip;
-            this.currentClipId = null; // 動画切り替え用ID
+            // ⚡ 重要: 複数クリップ対応 - 最初のクリップの場合のみ初期設定
+            if (this.timelineClips.length === 1) {
+                // 最初のクリップの場合
+                this.frames = frameData.frames;
+                this.selectedTimelineClip = timelineClip;
+                this.currentClipId = null; // 動画切り替え用ID
+                
+                // hiddenVideoに最初の動画をセット（完全準備まで待機）
+                this.hiddenVideo.src = this.selectedClip.filePath;
+            } else {
+                // 2つ目以降のクリップは追加のみ
+                console.log(`📼 Added clip #${this.timelineClips.length} to timeline`);
+                // hiddenVideoは再生時に動的に切り替える
+            }
             
-            // hiddenVideoに動画をセット（完全準備まで待機）
-            this.hiddenVideo.src = this.selectedClip.filePath;
-            await new Promise((resolve, reject) => {
-                this.hiddenVideo.oncanplaythrough = () => {
-                    console.log('✅ Hidden video ready for playback');
-                    resolve();
-                };
-                this.hiddenVideo.onerror = reject;
-            });
+            // 最初のクリップの場合のみ、hiddenVideoの準備を待つ
+            if (this.timelineClips.length === 1) {
+                await new Promise((resolve, reject) => {
+                    this.hiddenVideo.oncanplaythrough = () => {
+                        console.log('✅ Hidden video ready for playback');
+                        resolve();
+                    };
+                    this.hiddenVideo.onerror = reject;
+                });
+            }
             
             // フレーム総数更新
             this.updateTotalFrames();
@@ -422,13 +434,13 @@ class LOOOOPApp {
             this.updateUI();
             this.renderTimeline();
             
-            // LoopEngineに動画を読み込み
-            if (this.loopEngine && this.selectedClip) {
+            // LoopEngineに最初の動画だけを読み込み（複数クリップは別途処理が必要）
+            if (this.loopEngine && this.selectedClip && this.timelineClips.length === 1) {
                 try {
                     const videoPath = this.selectedClip.filePath || this.selectedClip.path;
-                    console.log('🔄 Loading video into LoopEngine:', videoPath);
+                    console.log('🔄 Loading first video into LoopEngine:', videoPath);
                     await this.loopEngine.loadVideo(videoPath);
-                    console.log('✅ Video loaded into LoopEngine');
+                    console.log('✅ First video loaded into LoopEngine');
                 } catch (error) {
                     console.warn('⚠️ Failed to load video into LoopEngine:', error);
                 }
@@ -437,8 +449,9 @@ class LOOOOPApp {
             // 実際の再生時間を計算して表示
             this.updateActualDurationDisplay();
             
-            console.log(`✅ Clip set successfully - ${this.frames.length} frames ready`);
+            console.log(`✅ Clip set successfully - ${this.selectedClip.frames ? this.selectedClip.frames.length : 0} frames ready`);
             console.log(`📊 Total frames: ${this.totalFrames} (${this.loopCount} loops)`);
+            console.log(`🎬 Timeline now has ${this.timelineClips.length} clips total`);
             
         } catch (error) {
             console.error('❌ Failed to set clip:', error);
@@ -541,6 +554,7 @@ class LOOOOPApp {
             const reverseFrames = clip.frames.length - 1;
             const framesPerLoop = forwardFrames + reverseFrames;
             const clipTotalFrames = framesPerLoop * clip.loopCount;
+            console.log(`📹 Clip "${clip.fileName}": ${clipTotalFrames} frames (${forwardFrames}+${reverseFrames} × ${clip.loopCount} loops)`);
             return total + clipTotalFrames;
         }, 0);
         
@@ -551,7 +565,7 @@ class LOOOOPApp {
         if (totalFramesEl) totalFramesEl.textContent = this.totalFrames;
         if (totalLoopsEl) totalLoopsEl.textContent = this.timelineClips.length;
         
-        console.log(`📊 Total frames: ${this.totalFrames} (${this.timelineClips.length} clips)`);
+        console.log(`📊 TOTAL: ${this.totalFrames} frames for ${this.timelineClips.length} clips combined`);
     }
     
     updateUI() {
@@ -564,26 +578,26 @@ class LOOOOPApp {
     }
     
     renderTimeline() {
-        const timelineTrack = document.getElementById('timelineTrack');
+        const clipsContainer = document.getElementById('clipsContainer');
         
-        if (!timelineTrack) {
-            console.error('❌ Timeline track element not found');
+        if (!clipsContainer) {
+            console.error('❌ Clips container element not found');
             return;
         }
         
         console.log(`🎬 Rendering timeline with ${this.timelineClips.length} clips`);
         
-        const placeholder = timelineTrack.querySelector('.timeline-placeholder');
-        if (placeholder) {
-            placeholder.style.display = 'none';
+        const trackPlaceholder = document.getElementById('trackPlaceholder');
+        if (trackPlaceholder) {
+            trackPlaceholder.style.display = 'none';
         }
         
         // 既存のクリップをすべて削除
-        timelineTrack.querySelectorAll('.timeline-clip').forEach(clip => clip.remove());
+        clipsContainer.querySelectorAll('.timeline-clip').forEach(clip => clip.remove());
         
         // 総時間を計算
         const totalSeconds = this.calculateTotalDuration();
-        const trackWidth = timelineTrack.clientWidth - 40; // パディング分を除く
+        const trackWidth = clipsContainer.clientWidth || 800; // デフォルト幅を設定
         
         let currentTime = 0;
         
@@ -629,13 +643,13 @@ class LOOOOPApp {
                 this.selectTimelineClip(index);
             });
             
-            timelineTrack.appendChild(timelineClip);
+            clipsContainer.appendChild(timelineClip);
             console.log(`✅ Added timeline clip to DOM: ${clip.fileName}`);
             currentTime += clipDuration;
         });
         
         console.log(`🎬 Timeline rendering complete: ${this.timelineClips.length} clips added`);
-        console.log('Final timelineTrack children:', timelineTrack.children.length);
+        console.log('Final clipsContainer children:', clipsContainer.children.length);
         
         // 全体時間の更新
         this.updateTotalFrames();
@@ -677,6 +691,13 @@ class LOOOOPApp {
         
         // 選択状態を設定
         this.timelineClips[index].selected = true;
+        this.selectedClipIndex = index; // 重要：選択インデックスを保存
+        
+        // 削除ボタンを有効化
+        const deleteBtn = document.getElementById('deleteSelectedClip');
+        if (deleteBtn) {
+            deleteBtn.disabled = false;
+        }
         
         // 視覚的フィードバック
         document.querySelectorAll('.timeline-clip').forEach((element, i) => {
@@ -687,7 +708,7 @@ class LOOOOPApp {
             }
         });
         
-        console.log(`✅ Selected timeline clip: ${this.timelineClips[index].fileName}`);
+        console.log(`✅ Selected timeline clip #${index}: ${this.timelineClips[index].fileName}`);
     }
     
     // 3. リアルタイム調整 - ループ数変更を即座に反映
@@ -912,7 +933,8 @@ class LOOOOPApp {
         ctx.clearRect(0, 0, width, height);
 
         // 背景色（テーマ対応）
-        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-primary') || '#0f0f0f';
+        const isDarkMode = document.body.classList.contains('night-mode');
+        ctx.fillStyle = isDarkMode ? '#1a1a1a' : '#fafafa';
         ctx.fillRect(0, 0, width, height);
 
         // グリッド描画
@@ -1398,8 +1420,8 @@ class LOOOOPApp {
             return;
         }
         
-        if (!this.frames || !this.frames.length) {
-            console.error('❌ No frames available for playback');
+        if (!this.timelineClips || this.timelineClips.length === 0) {
+            console.error('❌ No clips available for playback');
             return;
         }
         
@@ -1408,23 +1430,41 @@ class LOOOOPApp {
             return;
         }
         
-        // LoopEngineを使用した再生
-        if (this.loopEngine && this.loopEngine.frames && this.loopEngine.frames.length > 0) {
-            // LoopEngineにデータを設定
-            this.loopEngine.setLoopCount(this.loopCount);
-            
-            // LoopEngineで再生開始
-            this.loopEngine.play();
-            this.isPlaying = true;
-            
-            console.log('▶️ Loop playback started via LoopEngine');
-        } else if (this.frames && this.frames.length > 0) {
-            // フォールバック: 従来のアニメーション（従来のフレームシステム使用）
+        // 複数クリップの場合は直接アニメーション、単一クリップはLoopEngine
+        if (this.timelineClips && this.timelineClips.length > 1) {
+            // 複数クリップ: 直接アニメーション使用（LoopEngineは単一クリップ専用）
             this.isPlaying = true;
             this.lastFrameTime = performance.now();
             this.animate();
             
-            console.log('▶️ Loop playback started via fallback animation');
+            console.log('▶️ Multi-clip playback started via direct animation');
+        } else if (this.loopEngine && this.loopEngine.frames && this.loopEngine.frames.length > 0) {
+            // 単一クリップ: LoopEngine使用
+            this.loopEngine.setLoopCount(this.loopCount);
+            this.loopEngine.play();
+            this.isPlaying = true;
+            
+            console.log('▶️ Single-clip playback started via LoopEngine');
+        } else if (this.timelineClips && this.timelineClips.length > 0) {
+            // フォールバック: 複数クリップアニメーション
+            this.isPlaying = true;
+            this.lastFrameTime = performance.now();
+            this.animate();
+            
+            console.log('▶️ Loop playback started via multi-clip animation');
+            
+            // 🐛 デバッグ: 全クリップの範囲を表示
+            console.log('📊 === CLIP RANGES DEBUG ===');
+            let debugCurrentFrame = 0;
+            this.timelineClips.forEach((clip, index) => {
+                const forwardFrames = clip.frames.length;
+                const reverseFrames = clip.frames.length - 1;
+                const framesPerLoop = forwardFrames + reverseFrames;
+                const clipTotalFrames = framesPerLoop * clip.loopCount;
+                console.log(`📹 Clip ${index + 1}: "${clip.fileName}" - Frames ${debugCurrentFrame} to ${debugCurrentFrame + clipTotalFrames - 1} (${clipTotalFrames} frames)`);
+                debugCurrentFrame += clipTotalFrames;
+            });
+            console.log(`📊 TOTAL EXPECTED: ${debugCurrentFrame} frames, ACTUAL: ${this.totalFrames} frames`);
         } else {
             console.error('❌ No frames available for playback in either LoopEngine or fallback system');
             alert('動画データがありません。再度セットしてください。');
@@ -1438,10 +1478,18 @@ class LOOOOPApp {
     pauseLoop() {
         this.isPlaying = false;
         
-        // LoopEngine使用時
-        if (this.loopEngine) {
+        // 複数クリップか単一クリップかで処理を分ける
+        if (this.timelineClips && this.timelineClips.length > 1) {
+            // 複数クリップ: 直接制御
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+            console.log('⏸️ Multi-clip playback paused via direct control');
+        } else if (this.loopEngine) {
+            // 単一クリップ: LoopEngine使用
             this.loopEngine.pause();
-            console.log('⏸️ Loop playback paused via LoopEngine');
+            console.log('⏸️ Single-clip playback paused via LoopEngine');
         } else {
             // フォールバック
             if (this.animationId) {
@@ -1458,10 +1506,17 @@ class LOOOOPApp {
     stopLoop() {
         this.pauseLoop();
         
-        // LoopEngine使用時
-        if (this.loopEngine) {
+        // 複数クリップか単一クリップかで処理を分ける
+        if (this.timelineClips && this.timelineClips.length > 1) {
+            // 複数クリップ: 直接制御
+            this.currentFrame = 0;
+            this.drawCurrentFrame();
+            this.updateFrameInfo();
+            console.log('⏹️ Multi-clip playback stopped via direct control');
+        } else if (this.loopEngine) {
+            // 単一クリップ: LoopEngine使用
             this.loopEngine.stop();
-            console.log('⏹️ Loop playback stopped via LoopEngine');
+            console.log('⏹️ Single-clip playback stopped via LoopEngine');
         } else {
             // フォールバック
             this.currentFrame = 0;
@@ -1499,6 +1554,9 @@ class LOOOOPApp {
             });
             this.updateFrameInfo();
             
+            // プレイヘッドの位置を更新（重要！）
+            this.updatePlayhead();
+            
             // タイムラインインジケーターも更新
             const currentProgress = this.currentFrame / (this.totalFrames - 1);
             this.updateSpeedCurveTimelineIndicator(currentProgress);
@@ -1510,19 +1568,14 @@ class LOOOOPApp {
     }
     
     async drawCurrentFrame() {
-        // 厳密な存在チェック
-        if (!this.frames || !this.frames.length) {
-            console.warn('⚠️ No frames available');
+        // 厳密な存在チェック - 複数クリップ対応
+        if (!this.timelineClips || this.timelineClips.length === 0) {
+            console.warn('⚠️ No timeline clips available');
             return;
         }
         
         if (!this.canvas || !this.ctx || !this.hiddenVideo) {
             console.warn('⚠️ Canvas elements not ready');
-            return;
-        }
-        
-        if (this.hiddenVideo.readyState < 2) {
-            console.warn('⚠️ Hidden video not loaded');
             return;
         }
         
@@ -1535,27 +1588,48 @@ class LOOOOPApp {
         
         const { clip, localFrame, isReverse } = clipInfo;
         
-        // 動画を切り替える必要があるかチェック
+        // 動画を切り替える必要があるかチェック（改善版）
         if (this.currentClipId !== clip.id) {
-            console.log(`🔄 Switching to clip: ${clip.name} (ID: ${clip.id})`);
-            this.hiddenVideo.src = clip.filePath;
-            this.currentClipId = clip.id;
+            console.log(`🔄 Switching to clip: ${clip.fileName || clip.name} (ID: ${clip.id})`);
+            console.log(`📁 File path: ${clip.filePath}`);
+            console.log(`🎬 Global frame ${this.currentFrame} -> Local frame ${localFrame} (${isReverse ? 'Reverse' : 'Forward'})`);
             
-            // 動画切り替え待機
-            await new Promise((resolve, reject) => {
-                this.hiddenVideo.oncanplaythrough = resolve;
-                this.hiddenVideo.onerror = reject;
-            });
+            // 確実な動画切り替え処理
+            try {
+                await this.switchToClipQuick(clip);
+            } catch (error) {
+                console.warn('⚠️ Video switching failed:', error);
+                return; // エラー時は描画をスキップ
+            }
         }
         
-        // ローカルフレームから時間を算出
-        const sourceFrameIndex = isReverse ? 
-            (clip.frames.length - 1 - (localFrame % clip.frames.length)) : 
-            (localFrame % clip.frames.length);
-            
-        if (sourceFrameIndex >= clip.frames.length) return;
+        // ローカルフレームから時間を算出（正確なクリップフレーム使用）
+        const loopIndex = Math.floor(localFrame / (clip.frames.length + (clip.frames.length - 1)));
+        const frameInLoop = localFrame % (clip.frames.length + (clip.frames.length - 1));
+        
+        let sourceFrameIndex;
+        if (isReverse) {
+            // 逆再生フレーム計算
+            const reverseIndex = frameInLoop - clip.frames.length;
+            sourceFrameIndex = clip.frames.length - 1 - reverseIndex;
+        } else {
+            // 正再生フレーム計算
+            sourceFrameIndex = frameInLoop;
+        }
+        
+        // フレームインデックスの有効性チェック
+        if (sourceFrameIndex < 0 || sourceFrameIndex >= clip.frames.length) {
+            console.warn(`⚠️ Invalid frame index ${sourceFrameIndex} for clip with ${clip.frames.length} frames`);
+            return;
+        }
         
         const targetTime = clip.frames[sourceFrameIndex].time;
+        
+        // 詳細デバッグログ（フレーム切り替え時のみ）
+        if (this.lastLoggedFrame !== this.currentFrame) {
+            console.log(`🎯 Frame ${this.currentFrame}: Clip="${clip.fileName}", Local=${localFrame}, Source=${sourceFrameIndex}, Time=${targetTime.toFixed(3)}s, ${isReverse ? 'REV' : 'FWD'}`);
+            this.lastLoggedFrame = this.currentFrame;
+        }
         
         try {
             // ビデオをシーク（確実な完了待機）
@@ -1636,7 +1710,7 @@ class LOOOOPApp {
         return { sourceFrame, isReverse, loopIndex };
     }
     
-    // 🎬 複数動画結合: 現在のフレームがどの動画クリップに属するかを判定
+    // 🎬 複数動画結合: 現在のフレームがどの動画クリップに属するかを判定（高精度版）
     getClipInfoForFrame(globalFrame) {
         if (!this.timelineClips || this.timelineClips.length === 0) {
             console.warn('⚠️ No timeline clips available');
@@ -1644,6 +1718,7 @@ class LOOOOPApp {
         }
         
         let currentFrame = 0;
+        let clipIndex = 0;
         
         for (const clip of this.timelineClips) {
             // このクリップの総フレーム数（ループ考慮）
@@ -1660,18 +1735,27 @@ class LOOOOPApp {
                 
                 const isReverse = frameInLoop >= forwardFrames;
                 
+                // デバッグ用の詳細ログ（最初の切り替え時のみ）
+                if (globalFrame === currentFrame) {
+                    console.log(`🎬 RANGE: Clip ${clipIndex + 1}/${this.timelineClips.length} "${clip.fileName}" handles frames ${currentFrame}-${currentFrame + clipTotalFrames - 1} (${clipTotalFrames} total)`);
+                }
+                
                 return {
                     clip,
+                    clipIndex,
                     localFrame: frameInLoop,
                     isReverse,
-                    loopIndex
+                    loopIndex,
+                    globalStartFrame: currentFrame,
+                    globalEndFrame: currentFrame + clipTotalFrames - 1
                 };
             }
             
             currentFrame += clipTotalFrames;
+            clipIndex++;
         }
         
-        console.warn(`⚠️ Frame ${globalFrame} not found in any clip`);
+        console.warn(`⚠️ Frame ${globalFrame} not found in any clip (total: ${currentFrame} frames)`);
         return null;
     }
     
@@ -1863,16 +1947,88 @@ class LOOOOPApp {
     }
     
     updatePlayhead() {
-        const playhead = document.getElementById('playhead');
-        const timelineTrack = document.getElementById('timelineTrack');
+        const playheadContainer = document.getElementById('playheadContainer');
+        const clipsContainer = document.getElementById('clipsContainer');
         
-        if (!playhead || !timelineTrack || this.totalFrames <= 0) return;
+        if (!playheadContainer || !clipsContainer || this.totalFrames <= 0) return;
         
-        const progress = this.currentFrame / (this.totalFrames - 1);
-        const trackWidth = timelineTrack.offsetWidth - 30; // padding考慮
+        const progress = this.currentFrame / Math.max(1, this.totalFrames - 1);
+        const trackWidth = clipsContainer.offsetWidth;
         const position = progress * trackWidth;
         
-        playhead.style.left = `${position + 15}px`;
+        playheadContainer.style.left = `${position}px`;
+    }
+    
+    // プレイヘッドのドラッグ機能
+    setupPlayheadDrag() {
+        const playheadContainer = document.getElementById('playheadContainer');
+        const playheadHandle = document.getElementById('playheadHandle');
+        const clipsContainer = document.getElementById('clipsContainer');
+        
+        if (!playheadContainer || !playheadHandle || !clipsContainer) {
+            console.warn('⚠️ Playhead elements not found');
+            return;
+        }
+        
+        let isDragging = false;
+        
+        // プレイヘッドハンドルを見えるようにスタイル設定
+        playheadHandle.style.cursor = 'grab';
+        playheadContainer.style.pointerEvents = 'all';
+        
+        const startDrag = (e) => {
+            isDragging = true;
+            playheadHandle.style.cursor = 'grabbing';
+            e.preventDefault();
+        };
+        
+        const doDrag = (e) => {
+            if (!isDragging) return;
+            
+            // 総フレーム数を動的に計算
+            const totalFrames = this.calculateTotalFrames();
+            if (totalFrames <= 0) return;
+            
+            const rect = clipsContainer.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const progress = Math.max(0, Math.min(1, x / rect.width));
+            
+            // フレーム位置を計算してシーク
+            const targetFrame = Math.floor(progress * (totalFrames - 1));
+            this.currentFrame = targetFrame;
+            
+            console.log(`🎯 Drag: Frame ${this.currentFrame}/${totalFrames} (${(progress * 100).toFixed(1)}%)`);
+            
+            // プレイヘッド位置を更新
+            playheadContainer.style.left = `${x}px`;
+            
+            // 動画もシーク
+            this.drawCurrentFrame().catch(error => {
+                console.warn('⚠️ Draw error during drag:', error);
+            });
+            this.updateFrameInfo();
+            this.updateTimeDisplay();
+            
+            // 速度曲線のインジケーターも更新
+            if (this.updateSpeedCurveTimelineIndicator) {
+                this.updateSpeedCurveTimelineIndicator(progress);
+            }
+        };
+        
+        const stopDrag = () => {
+            if (isDragging) {
+                isDragging = false;
+                playheadHandle.style.cursor = 'grab';
+            }
+        };
+        
+        // イベントリスナー設定
+        playheadHandle.addEventListener('mousedown', startDrag);
+        playheadContainer.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', stopDrag);
+        
+        console.log('✅ Playhead drag functionality set up');
     }
     
     updateTimeDisplay() {
@@ -2682,18 +2838,8 @@ class LOOOOPApp {
     setupTimelineSpeedSync() {
         console.log('🔗 Setting up timeline-speed curve synchronization...');
         
-        // タイムライン内の速度曲線要素を初期化
-        this.speedCurveTimeline = document.getElementById('speedCurveTimeline');
-        this.speedPathTimeline = document.getElementById('speedPathTimeline');
-        this.speedAreaTimeline = document.getElementById('speedAreaTimeline');
-        
-        if (!this.speedCurveTimeline || !this.speedPathTimeline) {
-            console.error('❌ Timeline speed curve elements not found!');
-            return;
-        }
-        
-        // 初期同期実行
-        this.syncSpeedWithTimeline();
+        // Canvas速度曲線エディタは既に初期化済み
+        // 将来的にタイムライン内のミニ速度曲線を実装する場合のプレースホルダー
         
         console.log('✅ Timeline-speed curve sync initialized');
     }
@@ -3112,10 +3258,10 @@ class LOOOOPApp {
         this.timelineClips = [];
         
         // DOM要素をクリア
-        const timelineTrack = document.getElementById('timelineTrack');
-        if (timelineTrack) {
-            // プレイヘッドとプレースホルダー以外を削除
-            const clipsToRemove = timelineTrack.querySelectorAll('.timeline-clip');
+        const clipsContainer = document.getElementById('clipsContainer');
+        if (clipsContainer) {
+            // 全クリップを削除
+            const clipsToRemove = clipsContainer.querySelectorAll('.timeline-clip');
             clipsToRemove.forEach(clip => clip.remove());
         }
         
@@ -3166,6 +3312,63 @@ class LOOOOPApp {
                 timelineInfo.textContent = `${this.timelineClips.length}クリップ セット済み`;
             }
         }
+    }
+    
+    // 高速な動画切り替え処理（複数動画連結用）
+    async switchToClipQuick(clip) {
+        return new Promise((resolve, reject) => {
+            // 既に正しい動画がロードされている場合はスキップ
+            const currentSrc = this.hiddenVideo.src;
+            const clipPath = clip.filePath.replace(/\\/g, '/');
+            
+            if (currentSrc && currentSrc.includes(clipPath)) {
+                this.currentClipId = clip.id;
+                resolve();
+                return;
+            }
+            
+            console.log(`🔄 Quick loading video: ${clip.fileName}`);
+            
+            // タイムアウト設定（1秒）
+            let resolved = false;
+            const timeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    console.warn('⚠️ Video loading timeout, using fallback');
+                    resolve(); // タイムアウトでもresolveして描画を継続
+                }
+            }, 1000);
+            
+            const onReady = () => {
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timeout);
+                    this.hiddenVideo.oncanplaythrough = null;
+                    this.hiddenVideo.onerror = null;
+                    this.currentClipId = clip.id;
+                    console.log(`✅ Quick switch to: ${clip.fileName}`);
+                    resolve();
+                }
+            };
+            
+            const onError = (error) => {
+                if (!resolved) {
+                    resolved = true;
+                    clearTimeout(timeout);
+                    this.hiddenVideo.oncanplaythrough = null;
+                    this.hiddenVideo.onerror = null;
+                    console.error('❌ Video loading error:', error);
+                    resolve(); // エラーでもresolveして描画を継続
+                }
+            };
+            
+            // イベントリスナー設定
+            this.hiddenVideo.oncanplaythrough = onReady;
+            this.hiddenVideo.onerror = onError;
+            
+            // 動画切り替え実行
+            this.hiddenVideo.src = clip.filePath;
+        });
     }
 }
 

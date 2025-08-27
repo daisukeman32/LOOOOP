@@ -74,56 +74,75 @@
         <div class="timeline-panel">
             <h3>タイムライン</h3>
             
-            <!-- シークバーとコントロール -->
-            <div class="timeline-seekbar-container">
-                <div class="playback-controls">
-                    <button id="playBtn" class="control-btn">▶️</button>
-                    <button id="pauseBtn" class="control-btn" style="display: none;">⏸️</button>
-                    <button id="stopBtn" class="control-btn">⏹️</button>
+            
+            <!-- Adobe Premiere Pro風統合タイムライン -->
+            <div class="professional-timeline" id="professionalTimeline">
+                
+                <!-- 時間軸ルーラー（上部） -->
+                <div class="timeline-ruler" id="timelineRuler">
+                    <div class="ruler-scale" id="rulerScale">
+                        <!-- 時間マーカーは動的生成 -->
+                    </div>
                 </div>
-                <div class="seekbar-container">
-                    <input type="range" id="timelineSeekbar" class="timeline-seekbar" min="0" max="100" value="0">
-                    <div class="time-display">
-                        <span id="currentTimeDisplay">00:00</span>
-                        <span>/</span>
-                        <span id="totalTimeDisplay">00:00</span>
-                        <div class="speed-info" id="speedInfo">
-                            <small>平均速度: <span id="averageSpeedDisplay">1.0x</span></small>
+                
+                <!-- メイントラック（クリップ表示+シーク統合） -->
+                <div class="main-track-container" id="mainTrackContainer">
+                    <!-- 速度曲線ビジュアライザー（背景） -->
+                    <div class="speed-curve-background" id="speedCurveBackground">
+                        <canvas id="miniSpeedCurve" width="800" height="80"></canvas>
+                    </div>
+                    
+                    <!-- クリップトラック -->
+                    <div class="clip-track" id="clipTrack">
+                        <div class="track-placeholder" id="trackPlaceholder">
+                            <div class="placeholder-content">
+                                <span class="placeholder-icon">🎬</span>
+                                <span class="placeholder-text">クリップをドラッグしてタイムラインに配置</span>
+                            </div>
                         </div>
+                        
+                        <!-- クリップコンテナ（ドラッグ&ドロップ対応） -->
+                        <div class="clips-container" id="clipsContainer">
+                            <!-- クリップは動的に生成 -->
+                        </div>
+                    </div>
+                    
+                    <!-- プレイヘッド（ドラッグ可能なシーカー） -->
+                    <div class="playhead-container" id="playheadContainer">
+                        <div class="playhead-line" id="playheadLine"></div>
+                        <div class="playhead-handle" id="playheadHandle">
+                            <div class="playhead-triangle"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 選択範囲インジケーター -->
+                    <div class="selection-overlay" id="selectionOverlay"></div>
+                </div>
+                
+                
+                <!-- タイムライン情報バー -->
+                <div class="timeline-info-bar" id="timelineInfoBar">
+                    <div class="timeline-stats">
+                        <span class="time-display">
+                            <span id="currentTimeDisplay">00:00.00</span> / <span id="totalTimeDisplay">00:00.00</span>
+                        </span>
+                        <span class="frame-info" id="frameInfoDisplay">Frame: 0/0</span>
+                        <span class="speed-info" id="speedInfoDisplay">Speed: 1.00x</span>
+                    </div>
+                    <div class="timeline-zoom">
+                        <button class="zoom-btn" id="zoomOut" title="ズームアウト">－</button>
+                        <span class="zoom-level" id="zoomLevel">100%</span>
+                        <button class="zoom-btn" id="zoomIn" title="ズームイン">＋</button>
                     </div>
                 </div>
             </div>
-            
-            <div class="timeline-content" id="timeline">
-                <div class="timeline-ruler">
-                    <div class="ruler-markers" id="rulerMarkers"></div>
-                </div>
-                
-                <!-- 速度曲線レーン（タイムライン内に統合） -->
-                <div class="speed-lane">
-                    <div class="lane-label">速度</div>
-                    <svg id="speedCurveTimeline" class="speed-curve-timeline" width="100%" height="60">
-                        <defs>
-                            <linearGradient id="speedGradientTL" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:var(--accent-color);stop-opacity:0.2" />
-                                <stop offset="100%" style="stop-color:var(--accent-color);stop-opacity:0" />
-                            </linearGradient>
-                        </defs>
-                        <rect width="100%" height="60" fill="var(--bg-tertiary)" />
-                        <line x1="0" y1="30" x2="800" y2="30" stroke="var(--border-secondary)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
-                        <path id="speedPathTimeline" d="M0,30 L800,30" fill="none" stroke="var(--accent-color)" stroke-width="2" />
-                        <path id="speedAreaTimeline" d="M0,30 L800,30 L800,60 L0,60 Z" fill="url(#speedGradientTL)" opacity="0.3" />
-                    </svg>
-                </div>
-                
-                <div class="timeline-track" id="timelineTrack">
-                    <div class="timeline-placeholder">
-                        <p>ここにクリップをセットして編集を開始</p>
-                    </div>
-                    <div class="playhead" id="playhead"></div>
-                </div>
                 <div class="timeline-controls">
                     <div class="timeline-controls-left">
+                        <div class="playback-controls" style="display: inline-flex; gap: 8px; margin-right: 16px;">
+                            <button id="playBtn" class="control-btn" style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px; color: var(--text-primary);">▶️</button>
+                            <button id="pauseBtn" class="control-btn" style="display: none; padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px; color: var(--text-primary);">⏸️</button>
+                            <button id="stopBtn" class="control-btn" style="padding: 4px 8px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px; color: var(--text-primary);">⏹️</button>
+                        </div>
                         <span class="timeline-info" id="timelineInfo">セット待機中...</span>
                         <div class="timeline-help">
                             <small>💡 ドラッグで並び替え | Ctrl+S: セット | Delete: 削除 | Space: 再生/停止</small>

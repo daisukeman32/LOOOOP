@@ -13,7 +13,11 @@
       "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
       "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
       "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
-      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)"
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(C:\\ClaudeCode\\04_LOOOP/**)",
+      "Read(C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(C:\\ClaudeCode\\04_LOOOP\\src/**)"
     ],
     "deny": [],
     "ask": []
