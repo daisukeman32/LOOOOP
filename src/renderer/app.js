@@ -550,11 +550,10 @@ class LOOOOPApp {
         }
         
         this.totalFrames = this.timelineClips.reduce((total, clip) => {
-            const forwardFrames = clip.frames.length;
-            const reverseFrames = clip.frames.length - 1;
-            const framesPerLoop = forwardFrames + reverseFrames;
-            const clipTotalFrames = framesPerLoop * clip.loopCount;
-            console.log(`📹 Clip "${clip.fileName}": ${clipTotalFrames} frames (${forwardFrames}+${reverseFrames} × ${clip.loopCount} loops)`);
+            const actualFrames = clip.frames.length; // 実際のビデオフレーム数
+            const loopFrameCount = (actualFrames - 1) * 2; // ピンポン方式でのフレーム数
+            const clipTotalFrames = loopFrameCount * clip.loopCount;
+            console.log(`📹 Clip "${clip.fileName}": ${clipTotalFrames} frames (${actualFrames} actual → ${loopFrameCount} pingpong × ${clip.loopCount} loops)`);
             return total + clipTotalFrames;
         }, 0);
         
@@ -941,10 +940,10 @@ class LOOOOPApp {
         ctx.save();
         ctx.translate(margin.left, margin.top);
         
-        // 速度レベルのグリッド（0.1x, 0.5x, 1.0x, 1.5x, 2.0x, 2.5x, 3.0x）
-        const speedLevels = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        // 速度レベルのグリッド（0.1x, 1.0x, 2.0x, 3.0x, 4.0x, 5.0x）
+        const speedLevels = [0.1, 1.0, 2.0, 3.0, 4.0, 5.0];
         speedLevels.forEach(speed => {
-            const y = graphHeight - ((speed - 0.1) / 2.9) * graphHeight;
+            const y = graphHeight - ((speed - 0.1) / 4.9) * graphHeight;
             
             // グリッド線
             const gridColor = getComputedStyle(document.body).getPropertyValue('--border-primary') || '#333';
@@ -1246,7 +1245,7 @@ class LOOOOPApp {
             const t = i / steps;
             const y = this.calculateBezierY(t);
             
-            // Y座標を速度倍率に変換 (20=3.0x, 140=1.0x, 220=0.1x)
+            // Y座標を速度倍率に変換 (30=5.0x, 120=1.0x, 170=0.1x)
             const speed = this.yToSpeed(y);
             this.speedCurveData.push(speed);
         }
@@ -1374,15 +1373,15 @@ class LOOOOPApp {
     }
     
     yToSpeed(y) {
-        // Y座標を速度に変換 (20=3.0x, 140=1.0x, 220=0.1x)
+        // Y座標を速度に変換 (30=5.0x, 120=1.0x, 170=0.1x)
         const normalizedY = (y - 20) / 200; // 0-1の範囲
-        const speed = 3.0 - (normalizedY * 2.9); // 3.0から0.1への逆変換
-        return Math.max(0.1, Math.min(3.0, speed));
+        const speed = 5.0 - (normalizedY * 4.9); // 5.0から0.1への逆変換
+        return Math.max(0.1, Math.min(5.0, speed));
     }
     
     speedToY(speed) {
         // 速度をY座標に変換
-        const normalizedSpeed = (3.0 - speed) / 2.9; // 0-1の範囲
+        const normalizedSpeed = (5.0 - speed) / 4.9; // 0-1の範囲
         return 20 + (normalizedSpeed * 200);
     }
     
@@ -1534,51 +1533,69 @@ class LOOOOPApp {
         const deltaTime = now - this.lastFrameTime;
         
         // 現在の速度を曲線から取得
-        if (this.totalFrames > 0 && this.speedCurveData && this.speedCurveData.length > 0) {
-            const progress = this.currentFrame / this.totalFrames;
-            const speedIndex = Math.floor(progress * (this.speedCurveData.length - 1));
-            let rawSpeed = this.speedCurveData[speedIndex] || 1.0;
-            
-            // フリーズ防止: 最小速度を0.1xに制限
-            this.currentSpeed = Math.max(0.1, Math.min(3.0, rawSpeed));
-        } else {
-            this.currentSpeed = 1.0; // デフォルト速度
+        // 🚨 速度計算の間引き最適化（5フレームに1回のみ計算）
+        if (!this.speedUpdateCounter) this.speedUpdateCounter = 0;
+        
+        if (this.speedUpdateCounter % 5 === 0) {
+            if (this.totalFrames > 0 && this.speedCurveData && this.speedCurveData.length > 0) {
+                const progress = this.currentFrame / this.totalFrames;
+                const speedIndex = Math.floor(progress * (this.speedCurveData.length - 1));
+                let rawSpeed = this.speedCurveData[speedIndex] || 1.0;
+                
+                // 指示通り5倍速対応
+                this.currentSpeed = Math.max(0.1, Math.min(5.0, rawSpeed));
+            } else {
+                this.currentSpeed = 1.0; // デフォルト速度
+            }
         }
+        this.speedUpdateCounter++;
         
         // 速度を反映したフレーム進行
         const frameDuration = 1000 / 30 / this.currentSpeed; // 30fps基準
         
-        // デバッグ: 速度変化をログ（10フレームごと）
-        if (this.currentFrame % 10 === 0 && this.currentSpeed !== 1.0) {
-            console.log(`⚡ Speed: ${this.currentSpeed.toFixed(2)}x at frame ${this.currentFrame}/${this.totalFrames}`);
-        }
+        // デバッグログを完全無効化（カクツキ対策）
         
         if (deltaTime >= frameDuration) {
-            this.currentFrame++;
+            // 🚀 超高速時はフレーム進行を複数フレーム一括処理
+            let frameIncrement = 1;
+            if (this.currentSpeed > 4.0) frameIncrement = 3;       // 4倍超: 3フレーム一括
+            else if (this.currentSpeed > 3.0) frameIncrement = 2;  // 3倍超: 2フレーム一括
+            
+            this.currentFrame += frameIncrement;
             
             if (this.currentFrame >= this.totalFrames) {
-                this.currentFrame = 0; // ループ
+                this.currentFrame = this.currentFrame % this.totalFrames; // ループ
             }
             
-            // パフォーマンス最適化: 描画頻度を調整（3フレームに1回）
-            const shouldDraw = (this.currentFrame % 3 === 0) || (this.currentSpeed > 2.0);
+            // 🚨 速度曲線高速化対応: 超極端なフレームスキップ
+            let drawInterval = 1;
+            if (this.currentSpeed > 4.0) drawInterval = 15;     // 4倍超: 15フレームに1回
+            else if (this.currentSpeed > 3.0) drawInterval = 12; // 3倍超: 12フレームに1回
+            else if (this.currentSpeed > 2.5) drawInterval = 8;  // 2.5倍超: 8フレームに1回
+            else if (this.currentSpeed > 2.0) drawInterval = 6;  // 2倍超: 6フレームに1回  
+            else if (this.currentSpeed > 1.5) drawInterval = 4;  // 1.5倍超: 4フレームに1回
+            
+            const shouldDraw = (this.currentFrame % drawInterval === 0);
             
             if (shouldDraw) {
-                // 非同期処理をブロッキングしないよう、Promiseで実行
-                this.drawCurrentFrame().catch(error => {
-                    console.warn('⚠️ Draw error in animation:', error);
-                });
+                // 🚨 緊急措置: 重い処理を非同期化してフレーム進行をブロックしない
+                setTimeout(() => {
+                    this.drawCurrentFrame().catch(error => {
+                        // エラーログも無効化
+                    });
+                }, 0);
             }
             
-            this.updateFrameInfo();
-            
-            // プレイヘッドの位置を更新（重要！）
-            this.updatePlayhead();
-            
-            // タイムラインインジケーター更新頻度を調整（10フレームに1回）
-            if (this.currentFrame % 10 === 0) {
-                const currentProgress = this.currentFrame / (this.totalFrames - 1);
-                this.updateSpeedCurveTimelineIndicator(currentProgress);
+            // 🚨 UI更新を大幅に間引き（30フレームに1回）
+            if (this.currentFrame % 30 === 0) {
+                this.updateFrameInfo();
+                this.updatePlayhead();
+                
+                // タイムラインインジケーター更新は更に間引く（60フレームに1回）
+                if (this.currentFrame % 60 === 0) {
+                    const currentProgress = this.currentFrame / (this.totalFrames - 1);
+                    this.updateSpeedCurveTimelineIndicator(currentProgress);
+                }
             }
             
             this.lastFrameTime = now;
@@ -1623,59 +1640,79 @@ class LOOOOPApp {
             }
         }
         
-        // 最適化されたフレーム計算（逆再生時のカクツキ解消）
-        const forwardFrames = clip.frames.length;
-        const reverseFrames = forwardFrames - 1;
-        const totalFramesPerLoop = forwardFrames + reverseFrames;
+        // プロトタイプ7の正常動作に戻す
+        const totalClipFrames = clip.frames.length;
+        const loopFrameCount = (totalClipFrames - 1) * 2; // 往復で重複回避
         
-        const frameInLoop = localFrame % totalFramesPerLoop;
+        const frameInLoop = localFrame % loopFrameCount;
         let sourceFrameIndex;
+        let isReverseDirection;
         
-        if (frameInLoop < forwardFrames) {
-            // 正再生部分（0 ～ forwardFrames-1）
+        if (frameInLoop <= totalClipFrames - 1) {
+            // 正再生フェーズ: 0 → maxFrame-1 (最後のフレームを含む)
             sourceFrameIndex = frameInLoop;
+            isReverseDirection = false;
         } else {
-            // 逆再生部分（forwardFrames ～ totalFramesPerLoop-1）
-            const reversePosition = frameInLoop - forwardFrames;
-            sourceFrameIndex = forwardFrames - 2 - reversePosition; // -2で最後のフレーム重複を回避
+            // 逆再生フェーズ: maxFrame-2 → 0 (最後のフレームは重複回避)
+            const reverseProgress = frameInLoop - totalClipFrames;
+            sourceFrameIndex = (totalClipFrames - 2) - reverseProgress;
+            isReverseDirection = true;
         }
         
-        // 安全な範囲チェック（高速化）
-        sourceFrameIndex = Math.max(0, Math.min(sourceFrameIndex, forwardFrames - 1));
+        // 🚨 逆再生用強化境界保証
+        sourceFrameIndex = Math.max(0, Math.min(sourceFrameIndex, totalClipFrames - 1));
+        
+        // 逆再生時の異常値検出とフェイルセーフ
+        if (isReverseDirection && (sourceFrameIndex < 0 || sourceFrameIndex >= totalClipFrames)) {
+            console.error(`🚨 REVERSE ERROR: frame=${sourceFrameIndex}, total=${totalClipFrames}, local=${localFrame}`);
+            sourceFrameIndex = Math.floor(totalClipFrames / 2); // 中央フレームで復旧
+        }
         
         const targetTime = clip.frames[sourceFrameIndex].time;
         
-        // 詳細デバッグログ（フレーム切り替え時のみ）
-        if (this.lastLoggedFrame !== this.currentFrame) {
-            const isReversePhase = frameInLoop >= forwardFrames;
-            console.log(`🎯 Frame ${this.currentFrame}: Clip="${clip.fileName}", Local=${localFrame}, Source=${sourceFrameIndex}, Time=${targetTime.toFixed(3)}s, ${isReversePhase ? 'REV' : 'FWD'}`);
-            this.lastLoggedFrame = this.currentFrame;
-        }
+        // ピンポン再生デバッグログ無効化（パフォーマンス優先）
         
         try {
-            // 超高速シーク処理（逆再生カクツキ防止）
+            // 🎯 逆再生停止問題の根本解決: シーク処理の完全最適化
             const timeDiff = Math.abs(this.hiddenVideo.currentTime - targetTime);
-            if (timeDiff > 0.2) {
-                // 大きな時間差の場合のみシーク
+            
+            // 🚨 逆再生緊急対策: より大きな閾値で安定化
+            const speedFactor = Math.max(1.0, this.currentSpeed);
+            let seekThreshold, skipThreshold;
+            
+            if (isReverseDirection) {
+                // 逆再生時は更に大きな閾値でシーク頻度を激減
+                seekThreshold = 0.15 * speedFactor; // 0.08 → 0.15に拡大
+                skipThreshold = 0.05 * speedFactor; // 0.02 → 0.05に拡大
+            } else {
+                seekThreshold = 0.2 * speedFactor;
+                skipThreshold = 0.05 * speedFactor;
+            }
+            
+            if (timeDiff > seekThreshold) {
+                // シーク実行（非同期待機を完全排除）
                 this.hiddenVideo.currentTime = targetTime;
-                
-                // 待機時間を最小化（5ms）
-                await new Promise(resolve => {
-                    const timeout = setTimeout(resolve, 5);
-                    this.hiddenVideo.onseeked = () => {
-                        clearTimeout(timeout);
-                        resolve();
-                    };
-                });
-            } else if (timeDiff > 0.05) {
-                // 小さな時間差は待機なしでシーク
+            } else if (timeDiff <= skipThreshold) {
+                // 差が小さすぎる場合は何もしない（オーバーヘッド削減）
+            } else {
+                // 中間の差: 待機なし即座シーク
                 this.hiddenVideo.currentTime = targetTime;
             }
-            // 0.05秒以下の差は無視（カクツキ防止）
             
-            // 高速Canvas描画（最適化版）
+            // 📈 統計情報無効化（パフォーマンス優先）
+            
+            // 🚨 緊急対策: 超高速時はCanvas描画を大幅スキップ
             if (this.hiddenVideo.readyState < 2 || this.hiddenVideo.videoWidth === 0) {
-                return; // ビデオが準備できていない場合はスキップ
+                return;
+            }
+            
+            // 🚨 速度曲線対応: より厳しいCanvas描画制限
+            if (this.currentSpeed >= 4.0 && (this.currentFrame % 25 !== 0)) {
+                return; // 4倍速以上は25フレームに1回のCanvas描画
+            } else if (this.currentSpeed >= 3.0 && (this.currentFrame % 15 !== 0)) {
+                return; // 3倍速以上は15フレームに1回
+            } else if (this.currentSpeed >= 2.0 && (this.currentFrame % 8 !== 0)) {
+                return; // 2倍速以上は8フレームに1回
             }
             
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -2263,7 +2300,7 @@ class LOOOOPApp {
         const curve = [];
         for (let i = 0; i <= 100; i++) {
             const t = i / 100;
-            curve.push(0.3 + (t * t) * 2.7); // 0.3x から 3.0x へ
+            curve.push(0.1 + (t * t) * 4.9); // 0.1x から 5.0x へ
         }
         return curve;
     }
@@ -2272,7 +2309,7 @@ class LOOOOPApp {
         const curve = [];
         for (let i = 0; i <= 100; i++) {
             const t = i / 100;
-            curve.push(3.0 - (t * t) * 2.7); // 3.0x から 0.3x へ
+            curve.push(5.0 - (t * t) * 4.9); // 5.0x から 0.1x へ
         }
         return curve;
     }
@@ -2296,7 +2333,7 @@ class LOOOOPApp {
         for (let i = 0; i <= 100; i++) {
             const t = i / 100;
             const bounce = Math.abs(Math.sin(t * Math.PI * 3)) * 1.5 + 0.5;
-            curve.push(Math.min(3.0, bounce));
+            curve.push(Math.min(5.0, bounce));
         }
         return curve;
     }
@@ -2320,7 +2357,7 @@ class LOOOOPApp {
                 speed = midSpeed + (endSpeed - midSpeed) * ((t - 0.5) * 2);
             }
             
-            this.speedCurveData.push(Math.max(0.1, Math.min(3.0, speed)));
+            this.speedCurveData.push(Math.max(0.1, Math.min(5.0, speed)));
         }
         
         this.updateSpeedPreview();
@@ -2374,7 +2411,7 @@ class LOOOOPApp {
         // 速度値ラベル
         ctx.fillStyle = '#ccc';
         ctx.font = '10px Arial';
-        ctx.fillText('3.0x', 5, 12);
+        ctx.fillText('5.0x', 5, 12);
         ctx.fillText('2.0x', 5, height/2);
         ctx.fillText('1.0x', 5, height - 5);
     }
@@ -2801,15 +2838,13 @@ class LOOOOPApp {
         // デバッグ: 速度データの範囲を確認
         const minSpeed = Math.min(...speedData);
         const maxSpeed = Math.max(...speedData);
-        console.log(`🔍 Speed data range: ${minSpeed.toFixed(2)}x ~ ${maxSpeed.toFixed(2)}x (${speedData.length} points)`);
-        
         // LoopEngine（単一クリップ）にも適用
         if (this.loopEngine && this.timelineClips && this.timelineClips.length === 1) {
             this.loopEngine.setSpeedCurve(speedData);
-            console.log('⚡ Speed curve applied to LoopEngine (single clip)');
         }
         
-        console.log(`🎯 Speed curve applied: ${speedData.length} points (${this.timelineClips ? this.timelineClips.length : 0} clips)`);
+        // 秒数計算の即座更新を復元（元の動作）
+        this.updateActualDurationDisplay();
     }
     
     // Canvas座標から速度データ配列を生成
@@ -2874,15 +2909,11 @@ class LOOOOPApp {
         // y座標を正規化（上が速い、下が遅い）
         const normalizedY = Math.max(0, Math.min(1, (y - margin.top) / graphHeight));
         
-        // 反転：上（y=0）が高速3.0x、下（y=1）が低速0.1x
-        const speed = 3.0 - (normalizedY * 2.9);
+        // 指示通り5倍速実装
+        const speed = 5.0 - (normalizedY * 4.9); // 5.0 → 0.1
+        const clampedSpeed = Math.max(0.1, Math.min(5.0, speed));
         
-        const clampedSpeed = Math.max(0.1, Math.min(3.0, speed));
-        
-        // デバッグ: 座標変換をログ
-        if (Math.random() < 0.01) { // 1%の確率でログ
-            console.log(`📐 yToSpeed: y=${y.toFixed(1)} -> normalized=${normalizedY.toFixed(3)} -> speed=${clampedSpeed.toFixed(2)}x`);
-        }
+        // デバッグログを無効化（パフォーマンス優先）
         
         return clampedSpeed;
     }
