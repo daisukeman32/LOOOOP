@@ -9,30 +9,39 @@
 </head>
 <body>
     <div id="app">
-        <!-- メイン画面レイアウト -->
+        <!-- モード切り替えボタン -->
+        <div class="theme-toggle">
+            <button id="themeToggle" class="theme-toggle-btn" title="Day/Night モード切替">
+                <span class="theme-icon" id="themeIcon">🌞</span>
+            </button>
+        </div>
+        
+        <!-- メイン画面レイアウト（上半分：メディアプール35% + プレビュー65%） -->
         <div class="main-layout">
-            <!-- 左側: メディアプール -->
+            <!-- 左側: メディアプール（35%） -->
             <div class="media-pool">
                 <h3>メディアプール</h3>
                 <div class="media-pool-content" id="mediaPool">
                     <div class="import-area" id="importArea">
                         <div class="import-placeholder">
                             <div class="import-icon">📁</div>
-                            <p>動画ファイルをドロップ<br>または</p>
-                            <button class="import-button" id="importButton">インポート</button>
+                            <p>動画ファイルをドロップ<br>または クリックで選択</p>
+                            <button class="import-button" id="importButton">ファイルを選択</button>
                         </div>
                     </div>
                 </div>
                 
                 <!-- ループ回数設定 -->
                 <div class="loop-count-section">
-                    <label>ループ回数:</label>
-                    <input type="number" id="loopCount" min="1" max="99" value="3">
-                    <button class="set-button" id="setToTimeline">セット</button>
+                    <label>ループ回数</label>
+                    <div class="controls-row">
+                        <input type="number" id="loopCount" min="1" max="99" value="3">
+                        <button class="set-button" id="setToTimeline">セット</button>
+                    </div>
                 </div>
             </div>
 
-            <!-- 中央: プレビューパネル -->
+            <!-- 右側: プレビューパネル（65%） -->
             <div class="preview-panel">
                 <h3>ループ動画プレビュー</h3>
                 <div class="preview-content">
@@ -49,141 +58,11 @@
                         </div>
                     </div>
                     
-                    <!-- シークバー -->
-                    <div class="seekbar-container">
-                        <div class="seekbar" id="seekbar">
-                            <div class="seekbar-track" id="seekbarTrack">
-                                <div class="seekbar-progress" id="seekbarProgress"></div>
-                                <div class="seekbar-thumb" id="seekbarThumb"></div>
-                                <!-- ループマーカー -->
-                                <div class="loop-markers" id="loopMarkers"></div>
-                            </div>
-                        </div>
+                    <!-- フレーム情報のみ（シークバーはタイムラインに統合） -->
+                    <div class="preview-info">
                         <div class="frame-info">
                             <span id="currentFrame">0</span> / <span id="totalFrames">0</span> frames | 
                             ループ <span id="currentLoop">0</span> / <span id="totalLoops">0</span>
-                        </div>
-                    </div>
-                    
-                    <!-- 速度曲線エディタ（ワイド表示） -->
-                    <div class="speed-curve-editor-wide">
-                        <div class="speed-curve-header">
-                            <h4>速度曲線エディタ</h4>
-                            <div class="speed-curve-buttons">
-                                <button class="reset-button" id="resetSpeedCurveWide">リセット</button>
-                                <button class="apply-button" id="applySpeedCurveWide">適用</button>
-                            </div>
-                        </div>
-                        <svg id="speedCurveSvgWide" width="100%" height="160">
-                            <defs>
-                                <!-- 高精度グリッド -->
-                                <pattern id="fineGridWide" width="10" height="10" patternUnits="userSpaceOnUse">
-                                    <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#252525" stroke-width="0.5"/>
-                                </pattern>
-                                <pattern id="majorGridWide" width="40" height="40" patternUnits="userSpaceOnUse">
-                                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#404040" stroke-width="1"/>
-                                </pattern>
-                                <!-- グラデーション -->
-                                <linearGradient id="speedGradientWide" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" style="stop-color:#ff4444;stop-opacity:0.15" />
-                                    <stop offset="25%" style="stop-color:#ffaa44;stop-opacity:0.1" />
-                                    <stop offset="50%" style="stop-color:#ffffff;stop-opacity:0.05" />
-                                    <stop offset="75%" style="stop-color:#44ffaa;stop-opacity:0.1" />
-                                    <stop offset="100%" style="stop-color:#44ff44;stop-opacity:0.15" />
-                                </linearGradient>
-                                <!-- 影効果 -->
-                                <filter id="glowWide">
-                                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                                    <feMerge> 
-                                        <feMergeNode in="coloredBlur"/>
-                                        <feMergeNode in="SourceGraphic"/> 
-                                    </feMerge>
-                                </filter>
-                            </defs>
-                            
-                            <!-- 背景グラデーション -->
-                            <rect width="100%" height="100%" fill="url(#speedGradientWide)" />
-                            
-                            <!-- グリッドレイヤー -->
-                            <rect width="100%" height="100%" fill="url(#fineGridWide)" />
-                            <rect width="100%" height="100%" fill="url(#majorGridWide)" />
-                            
-                            <!-- 速度ゾーンラベル -->
-                            <g id="speedLabelsWide">
-                                <text x="8" y="20" fill="#ff4444" font-size="9" font-family="Consolas" font-weight="bold">4.0x</text>
-                                <text x="8" y="40" fill="#ff6666" font-size="9" font-family="Consolas">3.0x</text>
-                                <text x="8" y="60" fill="#ffaa66" font-size="9" font-family="Consolas">2.0x</text>
-                                <text x="8" y="80" fill="#ffffff" font-size="10" font-family="Consolas" font-weight="bold">1.0x</text>
-                                <text x="8" y="100" fill="#aaffaa" font-size="9" font-family="Consolas">0.5x</text>
-                                <text x="8" y="140" fill="#66ff66" font-size="9" font-family="Consolas">0.1x</text>
-                            </g>
-                            
-                            <!-- 中心基準線 -->
-                            <line x1="0" y1="80" x2="100%" y2="80" stroke="#666" stroke-width="2" stroke-dasharray="8,4" opacity="0.8" />
-                            
-                            <!-- ベジエ曲線 -->
-                            <path id="speedCurvePathWide" d="M0,80 C70,80 70,80 140,80 S210,80 280,80" 
-                                  fill="none" stroke="#4CAF50" stroke-width="3" filter="url(#glowWide)" />
-                            
-                            <!-- 制御ハンドル線 -->
-                            <g id="controlHandlesWide" opacity="0.4">
-                                <line id="handle0LineWide" x1="0" y1="80" x2="0" y2="80" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                <line id="handle1LineWide" x1="70" y1="80" x2="70" y2="80" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                <line id="handle2LineWide" x1="140" y1="80" x2="140" y2="80" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                <line id="handle3LineWide" x1="210" y1="80" x2="210" y2="80" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                                <line id="handle4LineWide" x1="280" y1="80" x2="280" y2="80" stroke="#888" stroke-width="1" stroke-dasharray="3,2" />
-                            </g>
-                            
-                            <!-- 全コントロールポイント（5点制御） -->
-                            <g id="controlPointsWide">
-                                <!-- 左端ポイント（開始点） -->
-                                <circle id="controlPoint0Wide" cx="0" cy="80" r="6" fill="#ff6b6b" stroke="#ffffff" stroke-width="2" cursor="move" 
-                                        class="control-point-wide endpoint" data-speed="1.0" />
-                                <!-- 中間制御ポイント -->
-                                <circle id="controlPoint1Wide" cx="70" cy="80" r="6" fill="#ffffff" stroke="#4CAF50" stroke-width="2" cursor="move" 
-                                        class="control-point-wide" data-speed="1.0" />
-                                <circle id="controlPoint2Wide" cx="140" cy="80" r="6" fill="#ffffff" stroke="#4CAF50" stroke-width="2" cursor="move" 
-                                        class="control-point-wide" data-speed="1.0" />
-                                <circle id="controlPoint3Wide" cx="210" cy="80" r="6" fill="#ffffff" stroke="#4CAF50" stroke-width="2" cursor="move" 
-                                        class="control-point-wide" data-speed="1.0" />
-                                <!-- 右端ポイント（終了点） -->
-                                <circle id="controlPoint4Wide" cx="280" cy="80" r="6" fill="#ff6b6b" stroke="#ffffff" stroke-width="2" cursor="move" 
-                                        class="control-point-wide endpoint" data-speed="1.0" />
-                            </g>
-                        </svg>
-                        
-                        <!-- ワイド版精密制御パネル -->
-                        <div class="curve-precision-panel-wide">
-                            <div class="precision-info-wide">
-                                <span class="precision-label-wide">精密制御:</span>
-                                <div class="precision-values-wide">
-                                    <div class="value-item-wide">
-                                        <label>P0:</label>
-                                        <input type="number" id="p0SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                                        <span>x</span>
-                                    </div>
-                                    <div class="value-item-wide">
-                                        <label>P1:</label>
-                                        <input type="number" id="p1SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                                        <span>x</span>
-                                    </div>
-                                    <div class="value-item-wide">
-                                        <label>P2:</label>
-                                        <input type="number" id="p2SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                                        <span>x</span>
-                                    </div>
-                                    <div class="value-item-wide">
-                                        <label>P3:</label>
-                                        <input type="number" id="p3SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                                        <span>x</span>
-                                    </div>
-                                    <div class="value-item-wide">
-                                        <label>P4:</label>
-                                        <input type="number" id="p4SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
-                                        <span>x</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -208,6 +87,9 @@
                         <span id="currentTimeDisplay">00:00</span>
                         <span>/</span>
                         <span id="totalTimeDisplay">00:00</span>
+                        <div class="speed-info" id="speedInfo">
+                            <small>平均速度: <span id="averageSpeedDisplay">1.0x</span></small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -216,6 +98,24 @@
                 <div class="timeline-ruler">
                     <div class="ruler-markers" id="rulerMarkers"></div>
                 </div>
+                
+                <!-- 速度曲線レーン（タイムライン内に統合） -->
+                <div class="speed-lane">
+                    <div class="lane-label">速度</div>
+                    <svg id="speedCurveTimeline" class="speed-curve-timeline" width="100%" height="60">
+                        <defs>
+                            <linearGradient id="speedGradientTL" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:var(--accent-color);stop-opacity:0.2" />
+                                <stop offset="100%" style="stop-color:var(--accent-color);stop-opacity:0" />
+                            </linearGradient>
+                        </defs>
+                        <rect width="100%" height="60" fill="var(--bg-tertiary)" />
+                        <line x1="0" y1="30" x2="800" y2="30" stroke="var(--border-secondary)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5" />
+                        <path id="speedPathTimeline" d="M0,30 L800,30" fill="none" stroke="var(--accent-color)" stroke-width="2" />
+                        <path id="speedAreaTimeline" d="M0,30 L800,30 L800,60 L0,60 Z" fill="url(#speedGradientTL)" opacity="0.3" />
+                    </svg>
+                </div>
+                
                 <div class="timeline-track" id="timelineTrack">
                     <div class="timeline-placeholder">
                         <p>ここにクリップをセットして編集を開始</p>
@@ -223,13 +123,80 @@
                     <div class="playhead" id="playhead"></div>
                 </div>
                 <div class="timeline-controls">
-                    <span class="timeline-info" id="timelineInfo">セット待機中...</span>
-                    <div class="timeline-help">
-                        <small>💡 ドラッグで並び替え | Ctrl+S: セット | Space: 再生/停止 | ←→: フレーム移動</small>
+                    <div class="timeline-controls-left">
+                        <span class="timeline-info" id="timelineInfo">セット待機中...</span>
+                        <div class="timeline-help">
+                            <small>💡 ドラッグで並び替え | Ctrl+S: セット | Delete: 削除 | Space: 再生/停止</small>
+                        </div>
+                    </div>
+                    <div class="timeline-controls-right">
+                        <button class="timeline-delete-btn" id="deleteSelectedClip" title="選択クリップを削除 (Delete)" disabled>
+                            🗑️ 削除
+                        </button>
+                        <button class="timeline-clear-btn" id="clearTimeline" title="タイムラインをクリア">
+                            🔄 クリア
+                        </button>
+                    </div>
+                </div>
+            
+            <!-- 統合された速度曲線エディタ（詳細制御） -->
+            <div class="speed-curve-editor">
+                <div class="speed-curve-header">
+                    <h4>速度曲線エディタ（詳細制御）</h4>
+                    <div class="speed-curve-help">
+                        Left Click: 支点追加 | Right Click: 支点削除 | Drag: 位置調整
+                    </div>
+                    <div class="speed-curve-buttons">
+                        <button class="reset-button" id="resetSpeedCurveWide">リセット</button>
+                        <button class="apply-button" id="applySpeedCurveWide">適用</button>
+                    </div>
+                </div>
+            <canvas id="speedCurveCanvas" width="800" height="200" style="
+                width: 100%;
+                height: 200px;
+                border: 1px solid var(--border-primary);
+                border-radius: 8px;
+                background: var(--bg-primary);
+                cursor: crosshair;
+                display: block;
+            "></canvas>
+            
+            <!-- ワイド版精密制御パネル -->
+            <div class="curve-precision-panel-wide">
+                <div class="precision-info-wide">
+                    <span class="precision-label-wide">精密制御:</span>
+                    <div class="precision-values-wide">
+                        <div class="value-item-wide">
+                            <label>P0:</label>
+                            <input type="number" id="p0SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
+                            <span>x</span>
+                        </div>
+                        <div class="value-item-wide">
+                            <label>P1:</label>
+                            <input type="number" id="p1SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
+                            <span>x</span>
+                        </div>
+                        <div class="value-item-wide">
+                            <label>P2:</label>
+                            <input type="number" id="p2SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
+                            <span>x</span>
+                        </div>
+                        <div class="value-item-wide">
+                            <label>P3:</label>
+                            <input type="number" id="p3SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
+                            <span>x</span>
+                        </div>
+                        <div class="value-item-wide">
+                            <label>P4:</label>
+                            <input type="number" id="p4SpeedWide" min="0.1" max="4.0" step="0.05" value="1.0">
+                            <span>x</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+            
+            </div> <!-- timeline-panel 終了 -->
+        </div> <!-- main content wrapper 終了 -->
     </div>
 
     <!-- ファイル入力（非表示） -->

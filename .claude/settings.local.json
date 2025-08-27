@@ -6,7 +6,14 @@
       "Bash(gh repo create:*)",
       "Bash(git remote add:*)",
       "Bash(git push:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)",
+      "Read(/C:\\ClaudeCode\\04_LOOOP\\src/**)"
     ],
     "deny": [],
     "ask": []

@@ -222,10 +222,33 @@ class LoopEngine {
             return 1.0;
         }
         
-        const progress = this.currentFrame / this.totalFrames;
-        const index = Math.floor(progress * (this.speedCurveData.length - 1));
+        if (this.totalFrames === 0) {
+            return 1.0;
+        }
         
-        return this.speedCurveData[index] || 1.0;
+        // フレーム進行度に基づいて速度値を取得
+        const progress = Math.max(0, Math.min(1, this.currentFrame / this.totalFrames));
+        const exactIndex = progress * (this.speedCurveData.length - 1);
+        const lowerIndex = Math.floor(exactIndex);
+        const upperIndex = Math.min(lowerIndex + 1, this.speedCurveData.length - 1);
+        
+        // 線形補間で滑らかな速度変化
+        if (lowerIndex === upperIndex) {
+            return this.speedCurveData[lowerIndex] || 1.0;
+        }
+        
+        const t = exactIndex - lowerIndex;
+        const lowerSpeed = this.speedCurveData[lowerIndex] || 1.0;
+        const upperSpeed = this.speedCurveData[upperIndex] || 1.0;
+        
+        const currentSpeed = lowerSpeed + (upperSpeed - lowerSpeed) * t;
+        
+        // デバッグ用（必要に応じてコメントアウト）
+        if (this.currentFrame % 30 === 0) { // 30フレームごとに表示
+            console.log(`Frame ${this.currentFrame}/${this.totalFrames} (${(progress * 100).toFixed(1)}%) - Speed: ${currentSpeed.toFixed(2)}x`);
+        }
+        
+        return currentSpeed;
     }
     
     // シーク

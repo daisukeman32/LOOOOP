@@ -11,6 +11,7 @@ class LOOOOPApp {
         
         // タイムライン管理
         this.timelineClips = []; // セットされたクリップの配列
+        this.selectedClipIndex = -1; // 選択中のクリップインデックス
         
         // Canvas/Video要素
         this.canvas = null;
@@ -21,6 +22,12 @@ class LOOOOPApp {
         // 速度制御
         this.speedCurveData = [];
         this.currentSpeed = 1.0;
+        
+        // 動画時間軸同期
+        this.videoDuration = 0; // 秒
+        this.videoFrameRate = 30; // fps
+        this.speedCurveWidth = 800; // px - 初期値、動画ロード時に自動調整
+        this.pixelsPerSecond = 0; // px/sec
         
         // アニメーション
         this.animationId = null;
@@ -35,7 +42,35 @@ class LOOOOPApp {
         this.setupSpeedCurveEditor();
         this.setupSpeedCurveEditorWide();
         this.initializeNewSpeedSystem();
+        this.setupTimelineSpeedSync();
+        this.setupThemeToggle();
+        this.setupTimelineClipSelection();
+        this.setupVideoTimelineSync();
         console.log('🚀 LOOOOP App initialized with speed curve editor');
+    }
+    
+    setupThemeToggle() {
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        
+        // ローカルストレージから保存されたテーマを読み込み（デフォルトはdark）
+        const savedTheme = localStorage.getItem('loooop-theme') || 'dark';
+        if (savedTheme === 'dark') {
+            document.body.classList.add('dark-mode');
+            if (themeIcon) themeIcon.textContent = '🌙';
+        } else {
+            if (themeIcon) themeIcon.textContent = '🌞';
+        }
+        
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const isDark = document.body.classList.toggle('dark-mode');
+                themeIcon.textContent = isDark ? '🌙' : '🌞';
+                localStorage.setItem('loooop-theme', isDark ? 'dark' : 'light');
+                
+                console.log(`🎨 Theme switched to ${isDark ? 'Night' : 'Day'} mode`);
+            });
+        }
     }
     
     initializeElements() {
@@ -123,11 +158,18 @@ class LOOOOPApp {
         this.setupTimelineSeekbar();
         
         // 従来のシークバーも維持
-        this.setupSeekbar();
+        // this.setupSeekbar(); // プレビューシークバーを削除したため無効化
+        
+        // タイムライン削除ボタン
+        this.setupTimelineDeleteButtons();
         
         // キーボードショートカット
         document.addEventListener('keydown', (e) => {
             this.handleKeyboardShortcut(e);
+            // 削除キー処理を追加
+            if (e.key === 'Delete' && this.selectedClipIndex !== -1) {
+                this.deleteSelectedClip();
+            }
         });
         
         console.log('Event listeners setup completed');
@@ -181,51 +223,91 @@ class LOOOOPApp {
         const mediaPool = document.getElementById('mediaPool');
         const importArea = document.getElementById('importArea');
         
-        files.forEach(file => {
+        console.log(`📦 Starting to add ${files.length} videos to media pool`);
+        
+        if (!mediaPool) {
+            console.error('❌ Media pool element not found');
+            return;
+        }
+        
+        if (!importArea) {
+            console.error('❌ Import area element not found');
+            return;
+        }
+        
+        files.forEach((file, index) => {
+            console.log(`📹 Processing video ${index + 1}/${files.length}: ${file.name}`);
             const clipElement = this.createMediaClipElement(file);
             mediaPool.insertBefore(clipElement, importArea);
+            console.log(`✅ Video element created and inserted: ${file.name}`);
         });
         
-        console.log(`✅ Added ${files.length} videos with thumbnails to media pool`);
+        console.log(`✅ Successfully added ${files.length} videos to media pool`);
     }
     
     createMediaClipElement(file) {
+        console.log(`🎬 Creating media clip element for: ${file.name}`);
         const clip = document.createElement('div');
         clip.className = 'media-clip';
         clip.dataset.filePath = file.path || URL.createObjectURL(file);
+        
+        // 初期表示（サムネ生成前）
+        clip.innerHTML = `
+            <div class="thumbnail-container">
+                <div class="thumbnail-loading">📹</div>
+            </div>
+            <div class="clip-name">${file.name}</div>
+        `;
+        
+        console.log(`📋 Clip element HTML structure created for: ${file.name}`);
         
         // サムネ生成
         const video = document.createElement('video');
         video.src = clip.dataset.filePath;
         video.muted = true;
         video.preload = 'metadata';
+        video.crossOrigin = 'anonymous';
         
         video.addEventListener('loadedmetadata', () => {
-            video.currentTime = Math.min(1, video.duration / 2); // 中間地点をサムネに
+            console.log(`📊 Video metadata loaded: ${file.name}, Duration: ${video.duration}s, Dimensions: ${video.videoWidth}x${video.videoHeight}`);
+            // 動画の中間地点をサムネに
+            video.currentTime = Math.max(0.1, Math.min(1, video.duration / 2));
         });
         
         video.addEventListener('seeked', () => {
-            const thumbnailCanvas = document.createElement('canvas');
-            const aspectRatio = video.videoWidth / video.videoHeight;
-            
-            // 適切なサムネイルサイズを計算
-            if (aspectRatio > 1.6) { // 横長動画
-                thumbnailCanvas.width = 200;
-                thumbnailCanvas.height = Math.round(200 / aspectRatio);
-            } else { // 正方形や縦長動画
-                thumbnailCanvas.height = 90;
-                thumbnailCanvas.width = Math.round(90 * aspectRatio);
+            try {
+                const thumbnailCanvas = document.createElement('canvas');
+                const aspectRatio = video.videoWidth / video.videoHeight || 16/9;
+                
+                // サムネイルサイズ計算
+                if (aspectRatio > 1.6) {
+                    thumbnailCanvas.width = 160;
+                    thumbnailCanvas.height = Math.round(160 / aspectRatio);
+                } else {
+                    thumbnailCanvas.height = 64;
+                    thumbnailCanvas.width = Math.round(64 * aspectRatio);
+                }
+                
+                const thumbCtx = thumbnailCanvas.getContext('2d');
+                thumbCtx.drawImage(video, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+                
+                // サムネイル更新
+                const thumbnailContainer = clip.querySelector('.thumbnail-container');
+                const thumbnailDataURL = thumbnailCanvas.toDataURL();
+                thumbnailContainer.innerHTML = `<img src="${thumbnailDataURL}" alt="thumbnail">`;
+                
+                console.log(`✅ Thumbnail generated for: ${file.name} (${thumbnailCanvas.width}x${thumbnailCanvas.height})`);
+            } catch (error) {
+                console.warn('⚠️ Thumbnail generation failed:', error);
+                const thumbnailContainer = clip.querySelector('.thumbnail-container');
+                thumbnailContainer.innerHTML = `<div class="thumbnail-error">❌</div>`;
             }
-            
-            const thumbCtx = thumbnailCanvas.getContext('2d');
-            thumbCtx.drawImage(video, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
-            
-            clip.innerHTML = `
-                <div class="thumbnail-container">
-                    <img src="${thumbnailCanvas.toDataURL()}" alt="thumbnail">
-                </div>
-                <div class="clip-name">${file.name}</div>
-            `;
+        });
+        
+        video.addEventListener('error', (e) => {
+            console.error('❌ Video loading error:', e);
+            const thumbnailContainer = clip.querySelector('.thumbnail-container');
+            thumbnailContainer.innerHTML = `<div class="thumbnail-error">❌</div>`;
         });
         
         // クリック選択
@@ -303,6 +385,9 @@ class LOOOOPApp {
             this.updateUI();
             this.renderTimeline();
             
+            // 実際の再生時間を計算して表示
+            this.updateActualDurationDisplay();
+            
             console.log(`✅ Clip set successfully - ${this.frames.length} frames ready`);
             console.log(`📊 Total frames: ${this.totalFrames} (${this.loopCount} loops)`);
             
@@ -323,10 +408,17 @@ class LOOOOPApp {
                 const fps = 30;
                 const frameCount = Math.floor(duration * fps);
                 
+                // 動画メタデータを保存
+                this.videoDuration = duration;
+                this.videoFrameRate = fps;
+                
                 const frames = Array.from({length: frameCount}, (_, i) => ({
                     index: i,
                     time: i / fps
                 }));
+                
+                // 速度曲線を動画時間に同期
+                this.syncSpeedCurveToVideoTime();
                 
                 resolve({ frames, duration });
             };
@@ -343,6 +435,49 @@ class LOOOOPApp {
             const clipTotalFrames = framesPerLoop * clip.loopCount;
             return total + (clipTotalFrames / 30); // 30fps基準で秒数計算
         }, 0);
+    }
+    
+    // 速度曲線を考慮した実際の再生時間を計算
+    calculateActualDuration() {
+        if (!this.timelineClips || this.timelineClips.length === 0) {
+            return 0;
+        }
+        
+        return this.timelineClips.reduce((total, clip) => {
+            const forwardFrames = clip.frames.length;
+            const reverseFrames = clip.frames.length - 1;
+            const framesPerLoop = forwardFrames + reverseFrames;
+            const clipTotalFrames = framesPerLoop * clip.loopCount;
+            
+            // このクリップの実際の再生時間を計算
+            const clipActualDuration = this.calculateClipActualDuration(clipTotalFrames);
+            return total + clipActualDuration;
+        }, 0);
+    }
+    
+    // 個別クリップの実際の再生時間を速度曲線から計算
+    calculateClipActualDuration(totalFrames) {
+        if (!this.speedCurvePointsWide || this.speedCurvePointsWide.length < 5) {
+            return totalFrames / 30; // 速度曲線がない場合は通常速度
+        }
+        
+        let totalTime = 0;
+        const samplesPerFrame = 10; // フレーム内のサンプリング数（精度調整）
+        
+        for (let frame = 0; frame < totalFrames; frame++) {
+            let frameTime = 0;
+            
+            // フレーム内を細かくサンプリングして速度を積分
+            for (let sample = 0; sample < samplesPerFrame; sample++) {
+                const progress = (frame + sample / samplesPerFrame) / totalFrames;
+                const speed = this.getSpeedAtProgress(progress);
+                frameTime += (1.0 / speed) / samplesPerFrame; // 速度の逆数が時間の倍率
+            }
+            
+            totalTime += frameTime;
+        }
+        
+        return totalTime / 30; // 30fpsで秒数に変換
     }
     
     updateTotalFrames() {
@@ -511,6 +646,9 @@ class LOOOOPApp {
         this.updateTotalFrames();
         this.renderTimeline();
         
+        // 実際の再生時間を更新
+        this.updateActualDurationDisplay();
+        
         // 現在再生中なら効果を即座に反映
         if (this.isPlaying) {
             if (this.currentFrame >= this.totalFrames) {
@@ -520,6 +658,45 @@ class LOOOOPApp {
         }
         
         console.log('⚡ Loop settings updated in real-time');
+    }
+    
+    // 実際の再生時間表示を更新
+    updateActualDurationDisplay() {
+        const originalDuration = this.calculateTotalDuration();
+        const actualDuration = this.calculateActualDuration();
+        
+        const originalTimeEl = document.getElementById('totalTimeDisplay');
+        const averageSpeedEl = document.getElementById('averageSpeedDisplay');
+        
+        if (originalTimeEl) {
+            // 実際の再生時間を表示
+            const originalText = this.formatTime(originalDuration);
+            const actualText = this.formatTime(actualDuration);
+            const speedRatio = (originalDuration / actualDuration).toFixed(2);
+            
+            originalTimeEl.textContent = actualText;
+            originalTimeEl.title = `元の長さ: ${originalText} | 実際の長さ: ${actualText} | 平均速度: ${speedRatio}x`;
+        }
+        
+        if (averageSpeedEl) {
+            // 平均速度を表示
+            const speedRatio = (originalDuration / actualDuration).toFixed(2);
+            averageSpeedEl.textContent = `${speedRatio}x`;
+            
+            // 速度による色分け
+            const speed = parseFloat(speedRatio);
+            if (speed > 1.5) {
+                averageSpeedEl.style.color = '#ff4444'; // 高速（赤）
+            } else if (speed > 1.1) {
+                averageSpeedEl.style.color = '#ffaa44'; // やや高速（橙）
+            } else if (speed < 0.8) {
+                averageSpeedEl.style.color = '#44ff44'; // 低速（緑）
+            } else {
+                averageSpeedEl.style.color = '#ffffff'; // 通常（白）
+            }
+        }
+        
+        console.log(`⏱️ Duration updated - Original: ${this.formatTime(originalDuration)}, Actual: ${this.formatTime(actualDuration)}, Speed: ${(originalDuration / actualDuration).toFixed(2)}x`);
     }
     
     // 4. リッチな速度曲線エディタ - 高機能ベジエ曲線制御
@@ -593,49 +770,348 @@ class LOOOOPApp {
     
     // ワイド版速度曲線エディタの初期化
     setupSpeedCurveEditorWide() {
-        console.log('🎨 Initializing wide speed curve editor...');
+        console.log('🎨 Setting up Canvas-based speed curve editor...');
         
-        // ワイド版DOM要素の取得
-        this.speedCurveSvgWide = document.getElementById('speedCurveSvgWide');
-        this.speedCurvePathWide = document.getElementById('speedCurvePathWide');
-        this.controlPointsWide = [
-            document.getElementById('controlPoint0Wide'),
-            document.getElementById('controlPoint1Wide'),
-            document.getElementById('controlPoint2Wide'),
-            document.getElementById('controlPoint3Wide'),
-            document.getElementById('controlPoint4Wide')
-        ];
-        
-        // ワイド版精密制御入力フィールド
-        this.precisionInputsWide = [
-            document.getElementById('p0SpeedWide'),
-            document.getElementById('p1SpeedWide'),
-            document.getElementById('p2SpeedWide'),
-            document.getElementById('p3SpeedWide'),
-            document.getElementById('p4SpeedWide')
-        ];
-        
-        // 存在確認
-        if (!this.speedCurveSvgWide || !this.speedCurvePathWide) {
-            console.error('❌ Wide speed curve elements not found!');
+        // Canvas要素を取得
+        this.speedCurveCanvas = document.getElementById('speedCurveCanvas');
+        if (!this.speedCurveCanvas) {
+            console.error('❌ Speed curve canvas not found!');
             return;
         }
         
-        // ワイド版速度曲線データの初期化（Y座標を160pxスケールに調整）
-        this.speedCurvePointsWide = [
-            { x: 0, y: 80, speed: 1.0 },
-            { x: 70, y: 80, speed: 1.0 },
-            { x: 140, y: 80, speed: 1.0 },
-            { x: 210, y: 80, speed: 1.0 },
-            { x: 280, y: 80, speed: 1.0 }
+        this.speedCurveCtx = this.speedCurveCanvas.getContext('2d');
+        
+        // 高DPI対応設定
+        this.setupHighDPICanvas();
+        
+        // 速度曲線データの初期化
+        this.speedCurvePoints = [
+            { x: 60, y: 120 },      // 開始点 (速度1.0x)
+            { x: 740, y: 120 }     // 終了点 (速度1.0x) - 800-60のマージン
         ];
         
-        this.initializeCurveInteractionsWide();
-        this.initializePrecisionControlsWide();
-        this.initializeCurveButtonsWide();
-        this.updateSpeedCurveWide();
+        this.selectedPoint = null;
+        this.hoveredPoint = null;
+        this.isDragging = false;
+        this.canvasWidth = 800;
+        this.canvasHeight = 200;
         
-        console.log('✅ Wide speed curve editor initialized!');
+        // イベントリスナー設定
+        this.setupCanvasEventListeners();
+        
+        // ボタンイベント設定
+        this.initializeCurveButtonsWide();
+        
+        // 初期描画
+        this.drawSpeedCurve();
+        
+        console.log('✅ Canvas-based speed curve editor initialized!');
+    }
+    
+    setupHighDPICanvas() {
+        const canvas = this.speedCurveCanvas;
+        const ctx = this.speedCurveCtx;
+        const dpr = window.devicePixelRatio || 1;
+        
+        // CSS表示サイズ
+        const displayWidth = 800;
+        const displayHeight = 200;
+        
+        // 実際のキャンバスサイズ（高解像度）
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
+        
+        // CSS表示サイズを設定
+        canvas.style.width = displayWidth + 'px';
+        canvas.style.height = displayHeight + 'px';
+        
+        // 座標系をスケール
+        ctx.scale(dpr, dpr);
+        
+        // アンチエイリアシング有効化
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        // 内部座標系も更新
+        this.canvasWidth = displayWidth;
+        this.canvasHeight = displayHeight;
+        
+        console.log(`High DPI Canvas setup: ${canvas.width}x${canvas.height} (DPR: ${dpr})`);
+    }
+    
+    setupCanvasEventListeners() {
+        // マウスイベント
+        this.speedCurveCanvas.addEventListener('mousedown', (e) => this.onSpeedCurveMouseDown(e));
+        this.speedCurveCanvas.addEventListener('mousemove', (e) => this.onSpeedCurveMouseMove(e));
+        this.speedCurveCanvas.addEventListener('mouseup', (e) => this.onSpeedCurveMouseUp(e));
+        this.speedCurveCanvas.addEventListener('mouseleave', (e) => this.onSpeedCurveMouseLeave(e));
+        this.speedCurveCanvas.addEventListener('contextmenu', (e) => this.onSpeedCurveRightClick(e));
+        
+        console.log('✅ Canvas event listeners set up');
+    }
+    
+    // Canvas描画メイン関数（参考実装から移植）
+    drawSpeedCurve() {
+        const ctx = this.speedCurveCtx;
+        const width = this.canvasWidth;
+        const height = this.canvasHeight;
+        const margin = { top: 30, right: 60, bottom: 40, left: 60 };
+        const graphWidth = width - margin.left - margin.right;
+        const graphHeight = height - margin.top - margin.bottom;
+
+        // 背景をクリア
+        ctx.clearRect(0, 0, width, height);
+
+        // 背景色（テーマ対応）
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-primary') || '#0f0f0f';
+        ctx.fillRect(0, 0, width, height);
+
+        // グリッド描画
+        ctx.save();
+        ctx.translate(margin.left, margin.top);
+        
+        // 速度レベルのグリッド（0.1x, 0.5x, 1.0x, 1.5x, 2.0x, 2.5x, 3.0x）
+        const speedLevels = [0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        speedLevels.forEach(speed => {
+            const y = graphHeight - ((speed - 0.1) / 2.9) * graphHeight;
+            
+            // グリッド線
+            const gridColor = getComputedStyle(document.body).getPropertyValue('--border-primary') || '#333';
+            ctx.strokeStyle = speed === 1.0 ? '#666' : gridColor;
+            ctx.lineWidth = speed === 1.0 ? 1 : 0.5;
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(graphWidth, y);
+            ctx.stroke();
+            
+            // 速度ラベル
+            ctx.font = '10px monospace';
+            ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text-secondary') || '#ccc';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${speed.toFixed(1)}x`, -5, y + 3);
+        });
+        
+        ctx.restore();
+
+        // 速度曲線を描画
+        if (this.speedCurvePoints.length > 1) {
+            const curveColor = getComputedStyle(document.body).getPropertyValue('--accent-color') || '#6a8fdb';
+            ctx.strokeStyle = curveColor;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            // グロー効果
+            ctx.shadowColor = curveColor;
+            ctx.shadowBlur = 8;
+            
+            ctx.beginPath();
+            ctx.moveTo(this.speedCurvePoints[0].x, this.speedCurvePoints[0].y);
+            
+            // ベジェ曲線で滑らかに描画
+            for (let i = 1; i < this.speedCurvePoints.length; i++) {
+                const prev = this.speedCurvePoints[i - 1];
+                const curr = this.speedCurvePoints[i];
+                
+                // 制御点を計算
+                const cp1x = prev.x + (curr.x - prev.x) * 0.3;
+                const cp1y = prev.y;
+                const cp2x = curr.x - (curr.x - prev.x) * 0.3;
+                const cp2y = curr.y;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, curr.x, curr.y);
+            }
+            ctx.stroke();
+            
+            // シャドウをリセット
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        }
+
+        // 制御点を描画
+        for (let i = 0; i < this.speedCurvePoints.length; i++) {
+            const point = this.speedCurvePoints[i];
+            
+            // 点の状態による色分け
+            let fillColor = '#666';
+            let strokeColor = '#999';
+            let radius = 6;
+            
+            if (i === this.selectedPoint) {
+                fillColor = '#ef4444'; // 選択中
+                strokeColor = '#dc2626';
+                radius = 8;
+            } else if (i === this.hoveredPoint) {
+                fillColor = '#888';
+                strokeColor = '#aaa';
+                radius = 7;
+            }
+            
+            // 外側のリング
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // 内側の塗りつぶし
+            ctx.fillStyle = fillColor;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, radius - 1, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    }
+    
+    // マウス座標取得（参考実装から移植）
+    getSpeedCurveMousePos(e) {
+        const rect = this.speedCurveCanvas.getBoundingClientRect();
+        
+        const displayX = e.clientX - rect.left;
+        const displayY = e.clientY - rect.top;
+        
+        const x = (displayX / rect.width) * this.canvasWidth;
+        const y = (displayY / rect.height) * this.canvasHeight;
+        
+        return { x, y };
+    }
+    
+    // 最も近い制御点を見つける
+    findNearestPoint(mousePos, threshold = 20) {
+        let nearestIndex = -1;
+        let nearestDistance = threshold;
+        
+        for (let i = 0; i < this.speedCurvePoints.length; i++) {
+            const point = this.speedCurvePoints[i];
+            const distance = Math.sqrt(
+                Math.pow(mousePos.x - point.x, 2) + Math.pow(mousePos.y - point.y, 2)
+            );
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestIndex = i;
+            }
+        }
+        return nearestIndex;
+    }
+    
+    // マウスダウンイベント
+    onSpeedCurveMouseDown(e) {
+        e.preventDefault();
+        const mousePos = this.getSpeedCurveMousePos(e);
+        const pointIndex = this.findNearestPoint(mousePos);
+
+        if (pointIndex !== -1) {
+            // 既存の点を選択
+            this.selectedPoint = pointIndex;
+            this.isDragging = true;
+        } else {
+            // 新しい点を追加
+            const newPoint = { x: mousePos.x, y: mousePos.y };
+            
+            // 挿入位置を決定
+            let insertIndex = this.speedCurvePoints.length;
+            for (let i = 0; i < this.speedCurvePoints.length; i++) {
+                if (mousePos.x < this.speedCurvePoints[i].x) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+            
+            this.speedCurvePoints.splice(insertIndex, 0, newPoint);
+            this.selectedPoint = insertIndex;
+            this.isDragging = true;
+            this.drawSpeedCurve();
+            
+            // 新しい点が追加されたらLoopEngineに反映
+            this.applySpeedCurveToEngine();
+        }
+    }
+    
+    // マウス移動イベント
+    onSpeedCurveMouseMove(e) {
+        const mousePos = this.getSpeedCurveMousePos(e);
+        
+        if (this.isDragging && this.selectedPoint !== null) {
+            // ドラッグ中の処理
+            const margin = { left: 60, right: 60, top: 30, bottom: 40 };
+            mousePos.x = Math.max(margin.left, Math.min(this.canvasWidth - margin.right, mousePos.x));
+            mousePos.y = Math.max(margin.top, Math.min(this.canvasHeight - margin.bottom, mousePos.y));
+
+            // 最初と最後の点のx座標は固定
+            if (this.selectedPoint === 0) {
+                this.speedCurvePoints[this.selectedPoint].y = mousePos.y;
+            } else if (this.selectedPoint === this.speedCurvePoints.length - 1) {
+                this.speedCurvePoints[this.selectedPoint].y = mousePos.y;
+            } else {
+                // 中間の点は自由に移動可能
+                this.speedCurvePoints[this.selectedPoint] = { x: mousePos.x, y: mousePos.y };
+                
+                // x座標でソート
+                this.speedCurvePoints.sort((a, b) => a.x - b.x);
+                
+                // 選択中の点のインデックスを更新
+                for (let i = 0; i < this.speedCurvePoints.length; i++) {
+                    if (Math.abs(this.speedCurvePoints[i].x - mousePos.x) < 1 && 
+                        Math.abs(this.speedCurvePoints[i].y - mousePos.y) < 1) {
+                        this.selectedPoint = i;
+                        break;
+                    }
+                }
+            }
+
+            this.drawSpeedCurve();
+            
+            // ドラッグ中に速度曲線をリアルタイム適用
+            this.applySpeedCurveToEngine();
+        } else {
+            // ホバー効果の処理
+            const hoveredPoint = this.findNearestPoint(mousePos);
+            
+            if (hoveredPoint !== this.hoveredPoint) {
+                this.hoveredPoint = hoveredPoint;
+                this.drawSpeedCurve();
+            }
+            
+            // カーソルの変更
+            this.speedCurveCanvas.style.cursor = hoveredPoint !== -1 ? 'pointer' : 'crosshair';
+        }
+    }
+    
+    // マウスアップイベント
+    onSpeedCurveMouseUp(e) {
+        this.isDragging = false;
+        this.selectedPoint = null;
+        this.speedCurveCanvas.style.cursor = 'crosshair';
+    }
+    
+    // マウスリーブイベント
+    onSpeedCurveMouseLeave(e) {
+        this.hoveredPoint = null;
+        this.isDragging = false;
+        this.selectedPoint = null;
+        this.speedCurveCanvas.style.cursor = 'crosshair';
+        this.drawSpeedCurve();
+    }
+    
+    // 右クリックイベント（点削除）
+    onSpeedCurveRightClick(e) {
+        e.preventDefault();
+        
+        const mousePos = this.getSpeedCurveMousePos(e);
+        const pointIndex = this.findNearestPoint(mousePos);
+
+        if (pointIndex !== -1 && pointIndex !== 0 && pointIndex !== this.speedCurvePoints.length - 1) {
+            // 最初と最後以外の点を削除
+            this.speedCurvePoints.splice(pointIndex, 1);
+            this.hoveredPoint = null;
+            this.selectedPoint = null;
+            this.drawSpeedCurve();
+            
+            // 速度曲線が変更されたらLoopEngineに反映
+            this.applySpeedCurveToEngine();
+            
+            console.log('Point deleted successfully');
+        }
+        
+        return false;
     }
     
     updateSpeedCurve() {
@@ -1255,7 +1731,7 @@ class LOOOOPApp {
         
         // 新しいインジケーターを作成
         const svgRect = speedCurveSvgWide.getBoundingClientRect();
-        const indicatorX = progress * 280; // SVG幅の280pxに対応
+        const indicatorX = progress * this.speedCurveWidth; // SVG幅に対応
         
         const indicatorLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         indicatorLine.setAttribute('id', 'timelineIndicator');
@@ -1663,6 +2139,12 @@ class LOOOOPApp {
         // メイン速度曲線データに同期（動画編集との連動）
         this.syncMainSpeedCurve();
         
+        // タイムラインと同期
+        this.syncSpeedWithTimeline();
+        
+        // 実際の再生時間をリアルタイム更新
+        this.updateActualDurationDisplay();
+        
         console.log('⚡ Wide speed curve updated and synced to main playback');
     }
     
@@ -1752,15 +2234,50 @@ class LOOOOPApp {
         let isDragging = false;
         let activePointIndex = -1;
         
+        // SVG曲線エリアのクリック処理（支点追加・削除）
+        if (this.speedCurveSvgWide) {
+            this.speedCurveSvgWide.addEventListener('click', (e) => {
+                if (isDragging) return; // ドラッグ中は無視
+                
+                const rect = this.speedCurveSvgWide.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = Math.max(10, Math.min(150, e.clientY - rect.top));
+                
+                // 左クリック: 支点追加
+                if (e.button === 0) {
+                    this.addSpeedPoint(x, y);
+                }
+                
+                e.preventDefault();
+            });
+            
+            // 右クリックコンテキストメニュー無効化
+            this.speedCurveSvgWide.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+        }
+        
+        // 制御点のイベント処理
         this.controlPointsWide.forEach((point, index) => {
             if (!point) return;
             
+            // 左クリック: ドラッグ開始
             point.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                activePointIndex = index;
-                point.classList.add('active');
-                document.body.style.cursor = 'grabbing';
+                if (e.button === 0) { // 左クリック
+                    isDragging = true;
+                    activePointIndex = index;
+                    point.classList.add('active');
+                    document.body.style.cursor = 'grabbing';
+                    e.preventDefault();
+                    e.stopPropagation(); // 親要素のクリックイベント防止
+                }
+            });
+            
+            // 右クリック: 支点削除
+            point.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
+                this.removeSpeedPoint(index);
+                e.stopPropagation();
             });
             
             point.addEventListener('mouseenter', () => {
@@ -1778,12 +2295,18 @@ class LOOOOPApp {
             });
         });
         
+        // ドラッグ処理
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || activePointIndex === -1 || !this.speedCurveSvgWide) return;
             
             const rect = this.speedCurveSvgWide.getBoundingClientRect();
+            const x = Math.max(0, Math.min(this.speedCurveWidth, e.clientX - rect.left));
             const y = Math.max(10, Math.min(150, e.clientY - rect.top));
             
+            // X座標の制約（隣接点との重複回避）
+            const constrainedX = this.constrainPointPosition(activePointIndex, x);
+            
+            this.speedCurvePointsWide[activePointIndex].x = constrainedX;
             this.speedCurvePointsWide[activePointIndex].y = y;
             this.speedCurvePointsWide[activePointIndex].speed = this.yToSpeedWide(y);
             
@@ -1800,6 +2323,157 @@ class LOOOOPApp {
                 document.body.style.cursor = 'default';
                 activePointIndex = -1;
             }
+        });
+    }
+    
+    // 支点追加
+    addSpeedPoint(x, y) {
+        const speed = this.yToSpeedWide(y);
+        const newPoint = { x, y, speed };
+        
+        // 挿入位置を決定（X座標でソート）
+        let insertIndex = this.speedCurvePointsWide.length;
+        for (let i = 0; i < this.speedCurvePointsWide.length; i++) {
+            if (x < this.speedCurvePointsWide[i].x) {
+                insertIndex = i;
+                break;
+            }
+        }
+        
+        this.speedCurvePointsWide.splice(insertIndex, 0, newPoint);
+        this.regenerateSpeedCurveElements();
+        this.updateSpeedCurveWide();
+        
+        console.log(`✨ Speed point added at x:${x.toFixed(1)}, speed:${speed.toFixed(2)}x`);
+    }
+    
+    // 支点削除
+    removeSpeedPoint(index) {
+        // 最低3点は保持
+        if (this.speedCurvePointsWide.length <= 3) {
+            console.warn('⚠️ Cannot remove point: minimum 3 points required');
+            return;
+        }
+        
+        this.speedCurvePointsWide.splice(index, 1);
+        this.regenerateSpeedCurveElements();
+        this.updateSpeedCurveWide();
+        
+        console.log(`🗑️ Speed point removed from index ${index}`);
+    }
+    
+    // 点の位置制約（隣接点との重複回避）
+    constrainPointPosition(index, x) {
+        const margin = 10; // 最小間隔
+        let constrainedX = x;
+        
+        // 左隣の制約
+        if (index > 0) {
+            const leftX = this.speedCurvePointsWide[index - 1].x;
+            constrainedX = Math.max(constrainedX, leftX + margin);
+        }
+        
+        // 右隣の制約
+        if (index < this.speedCurvePointsWide.length - 1) {
+            const rightX = this.speedCurvePointsWide[index + 1].x;
+            constrainedX = Math.min(constrainedX, rightX - margin);
+        }
+        
+        return constrainedX;
+    }
+    
+    // 速度曲線要素の再生成
+    regenerateSpeedCurveElements() {
+        // 既存の制御点を削除
+        const existingPoints = this.speedCurveSvgWide.querySelectorAll('.control-point-wide');
+        existingPoints.forEach(point => point.remove());
+        
+        // 制御ハンドル線も削除
+        const existingHandles = this.speedCurveSvgWide.querySelectorAll('#controlHandlesWide line');
+        existingHandles.forEach(handle => handle.remove());
+        
+        // 新しい制御点を生成
+        this.controlPointsWide = [];
+        const controlPointsGroup = this.speedCurveSvgWide.querySelector('#controlPointsWide') || 
+                                   this.speedCurveSvgWide.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'g'));
+        controlPointsGroup.setAttribute('id', 'controlPointsWide');
+        
+        this.speedCurvePointsWide.forEach((point, index) => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('id', `controlPoint${index}Wide`);
+            circle.setAttribute('cx', point.x);
+            circle.setAttribute('cy', point.y);
+            circle.setAttribute('r', '6');
+            circle.setAttribute('fill', '#ffffff');
+            circle.setAttribute('stroke', '#4CAF50');
+            circle.setAttribute('stroke-width', '2');
+            circle.setAttribute('cursor', 'move');
+            circle.classList.add('control-point-wide');
+            circle.setAttribute('data-speed', point.speed.toFixed(2));
+            
+            // 端点は赤色
+            if (index === 0 || index === this.speedCurvePointsWide.length - 1) {
+                circle.setAttribute('fill', '#ff6b6b');
+                circle.setAttribute('stroke', '#ffffff');
+                circle.classList.add('endpoint');
+            }
+            
+            controlPointsGroup.appendChild(circle);
+            this.controlPointsWide.push(circle);
+        });
+        
+        // 精密制御入力フィールドも再生成
+        this.regeneratePrecisionInputs();
+        
+        // イベントリスナーを再設定（重複回避）
+        this.cleanupCurveInteractions();
+        this.initializeCurveInteractionsWide();
+        this.initializePrecisionControlsWide();
+    }
+    
+    // イベントリスナーの重複回避
+    cleanupCurveInteractions() {
+        // 既存のイベントリスナーを削除
+        if (this.curveInteractionHandler) {
+            document.removeEventListener('mousemove', this.curveInteractionHandler);
+            document.removeEventListener('mouseup', this.curveInteractionHandler);
+        }
+    }
+    
+    // 精密制御入力フィールドの再生成
+    regeneratePrecisionInputs() {
+        const precisionPanel = document.querySelector('.precision-values-wide');
+        if (!precisionPanel) return;
+        
+        // 既存の入力フィールドをクリア
+        precisionPanel.innerHTML = '';
+        this.precisionInputsWide = [];
+        
+        // 新しい入力フィールドを生成
+        this.speedCurvePointsWide.forEach((point, index) => {
+            const valueItem = document.createElement('div');
+            valueItem.className = 'value-item-wide';
+            
+            const label = document.createElement('label');
+            label.textContent = `P${index}:`;
+            
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.id = `p${index}SpeedWide`;
+            input.min = '0.1';
+            input.max = '4.0';
+            input.step = '0.05';
+            input.value = point.speed.toFixed(2);
+            
+            const span = document.createElement('span');
+            span.textContent = 'x';
+            
+            valueItem.appendChild(label);
+            valueItem.appendChild(input);
+            valueItem.appendChild(span);
+            precisionPanel.appendChild(valueItem);
+            
+            this.precisionInputsWide.push(input);
         });
     }
     
@@ -1825,26 +2499,602 @@ class LOOOOPApp {
         if (resetButton) {
             resetButton.addEventListener('click', () => {
                 this.resetSpeedCurveWide();
+                this.updateActualDurationDisplay(); // リセット後の時間を再計算
             });
         }
         
         if (applyButton) {
             applyButton.addEventListener('click', () => {
+                this.applySpeedCurveToEngine(); // LoopEngineに速度曲線を適用
+                this.updateActualDurationDisplay(); // 実際の再生時間を再計算
                 console.log('🎯 Wide speed curve applied to playback system');
             });
         }
     }
     
     resetSpeedCurveWide() {
-        this.speedCurvePointsWide = [
-            { x: 0, y: 80, speed: 1.0 },
-            { x: 70, y: 80, speed: 1.0 },
-            { x: 140, y: 80, speed: 1.0 },
-            { x: 210, y: 80, speed: 1.0 },
-            { x: 280, y: 80, speed: 1.0 }
+        this.speedCurvePoints = [
+            { x: 60, y: 120 },      // 開始点 (速度1.0x)
+            { x: 740, y: 120 }     // 終了点 (速度1.0x)
         ];
+        this.drawSpeedCurve();
+        
+        // リセット後にLoopEngineに反映
+        this.applySpeedCurveToEngine();
+        
+        console.log('🔄 Canvas speed curve reset to default');
+    }
+    
+    // Canvas速度曲線データをLoopEngineに適用
+    applySpeedCurveToEngine() {
+        if (!this.loopEngine || !this.speedCurvePoints || this.speedCurvePoints.length < 2) {
+            console.log('⚠️ LoopEngine not available or insufficient speed curve data');
+            return;
+        }
+        
+        // Canvasの座標系から速度値に変換して配列データを生成
+        const speedData = this.generateSpeedDataFromCanvas();
+        
+        // LoopEngineに速度曲線データを設定
+        this.loopEngine.setSpeedCurve(speedData);
+        
+        console.log('🎯 Speed curve applied to LoopEngine:', speedData.length, 'data points');
+    }
+    
+    // Canvas座標から速度データ配列を生成
+    generateSpeedDataFromCanvas() {
+        const dataPoints = 100; // 100ポイントの配列データを生成
+        const speedData = [];
+        
+        const margin = { left: 60, right: 60, top: 30, bottom: 40 };
+        const graphWidth = this.canvasWidth - margin.left - margin.right;
+        const graphHeight = this.canvasHeight - margin.top - margin.bottom;
+        
+        // x軸に沿って等間隔で速度値をサンプリング
+        for (let i = 0; i < dataPoints; i++) {
+            const progress = i / (dataPoints - 1); // 0.0 ～ 1.0
+            const x = margin.left + progress * graphWidth;
+            
+            // ベジエ曲線上の対応する速度値を計算
+            const speed = this.getSpeedAtX(x);
+            speedData.push(speed);
+        }
+        
+        return speedData;
+    }
+    
+    // 指定されたx座標での速度値を計算（ベジエ補間）
+    getSpeedAtX(targetX) {
+        if (!this.speedCurvePoints || this.speedCurvePoints.length < 2) {
+            return 1.0;
+        }
+        
+        // 制御点をx座標でソート
+        const sortedPoints = [...this.speedCurvePoints].sort((a, b) => a.x - b.x);
+        
+        // targetXが範囲外の場合は端の値を返す
+        if (targetX <= sortedPoints[0].x) {
+            return this.yToSpeed(sortedPoints[0].y);
+        }
+        if (targetX >= sortedPoints[sortedPoints.length - 1].x) {
+            return this.yToSpeed(sortedPoints[sortedPoints.length - 1].y);
+        }
+        
+        // 線形補間で近似値を計算
+        for (let i = 0; i < sortedPoints.length - 1; i++) {
+            const p1 = sortedPoints[i];
+            const p2 = sortedPoints[i + 1];
+            
+            if (targetX >= p1.x && targetX <= p2.x) {
+                const t = (targetX - p1.x) / (p2.x - p1.x);
+                const y = p1.y + (p2.y - p1.y) * t;
+                return this.yToSpeed(y);
+            }
+        }
+        
+        return 1.0;
+    }
+    
+    // y座標から速度値に変換
+    yToSpeed(y) {
+        const margin = { top: 30, bottom: 40 };
+        const graphHeight = this.canvasHeight - margin.top - margin.bottom;
+        
+        // y座標を速度値に変換（上が速い、下が遅い）
+        const normalizedY = (this.canvasHeight - margin.bottom - y) / graphHeight;
+        const speed = 0.1 + normalizedY * 2.9; // 0.1x ～ 3.0x
+        
+        return Math.max(0.1, Math.min(3.0, speed));
+    }
+    
+    // === タイムライン・速度曲線同期システム ===
+    setupTimelineSpeedSync() {
+        console.log('🔗 Setting up timeline-speed curve synchronization...');
+        
+        // タイムライン内の速度曲線要素を初期化
+        this.speedCurveTimeline = document.getElementById('speedCurveTimeline');
+        this.speedPathTimeline = document.getElementById('speedPathTimeline');
+        this.speedAreaTimeline = document.getElementById('speedAreaTimeline');
+        
+        if (!this.speedCurveTimeline || !this.speedPathTimeline) {
+            console.error('❌ Timeline speed curve elements not found!');
+            return;
+        }
+        
+        // 初期同期実行
+        this.syncSpeedWithTimeline();
+        
+        console.log('✅ Timeline-speed curve sync initialized');
+    }
+    
+    syncSpeedWithTimeline() {
+        if (!this.speedPathTimeline || !this.speedAreaTimeline) return;
+        
+        // 現在の速度曲線データを取得（ワイド版から）
+        const speedData = this.getTimelineSpeedData();
+        
+        // タイムライン内の速度曲線パスを更新
+        const pathData = this.generateTimelineSpeedPath(speedData);
+        this.speedPathTimeline.setAttribute('d', pathData);
+        
+        // 速度エリアも更新
+        const areaData = this.generateTimelineSpeedArea(speedData);
+        this.speedAreaTimeline.setAttribute('d', areaData);
+        
+        // タイムラインの実際の長さを計算して更新
+        this.updateTimelineDuration(speedData);
+        
+        console.log('🔄 Timeline synchronized with speed curve');
+    }
+    
+    getTimelineSpeedData() {
+        // ワイド版速度曲線から100点のデータを生成
+        const points = [];
+        const steps = 100;
+        
+        if (!this.speedCurvePointsWide) {
+            // デフォルト値（1.0倍速）
+            for (let i = 0; i <= steps; i++) {
+                points.push(1.0);
+            }
+            return points;
+        }
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const y = this.calculateBezierYWide(t);
+            const speed = this.yToSpeedWide(y);
+            points.push(speed);
+        }
+        
+        return points;
+    }
+    
+    generateTimelineSpeedPath(speedData) {
+        const height = 60; // タイムライン速度レーンの高さ
+        const width = 100; // パーセンテージ幅
+        const baseY = height / 2; // 1.0x速度の基準線
+        
+        let pathData = `M0,${baseY}`;
+        
+        speedData.forEach((speed, index) => {
+            const x = (index / (speedData.length - 1)) * width;
+            // 速度を視覚的な高さに変換（1.0x = 中央、4.0x = 上端、0.1x = 下端）
+            const speedY = baseY - ((speed - 1.0) / 3.0) * (baseY - 5);
+            const clampedY = Math.max(5, Math.min(height - 5, speedY));
+            
+            if (index === 0) {
+                pathData += ` L${x},${clampedY}`;
+            } else {
+                pathData += ` L${x},${clampedY}`;
+            }
+        });
+        
+        return pathData;
+    }
+    
+    generateTimelineSpeedArea(speedData) {
+        const height = 60;
+        const width = 100;
+        const baseY = height / 2;
+        
+        let areaData = `M0,${baseY}`;
+        
+        // 上部パス
+        speedData.forEach((speed, index) => {
+            const x = (index / (speedData.length - 1)) * width;
+            const speedY = baseY - ((speed - 1.0) / 3.0) * (baseY - 5);
+            const clampedY = Math.max(5, Math.min(height - 5, speedY));
+            areaData += ` L${x},${clampedY}`;
+        });
+        
+        // 底部パス（塗りつぶし用）
+        areaData += ` L${width},${height} L0,${height} Z`;
+        
+        return areaData;
+    }
+    
+    updateTimelineDuration(speedData) {
+        if (!this.selectedClip || !this.totalFrames) return;
+        
+        // 速度曲線を適用した実際の再生時間を計算
+        let totalAdjustedFrames = 0;
+        const frameRate = 30; // 30fps想定
+        
+        speedData.forEach(speed => {
+            // 各セグメントでのフレーム時間を速度で調整
+            totalAdjustedFrames += 1.0 / speed;
+        });
+        
+        const originalDuration = this.totalFrames / frameRate;
+        const adjustedDuration = (totalAdjustedFrames * this.totalFrames / speedData.length) / frameRate;
+        
+        // タイムライン表示を更新
+        const totalTimeDisplay = document.getElementById('totalTimeDisplay');
+        if (totalTimeDisplay) {
+            const minutes = Math.floor(adjustedDuration / 60);
+            const seconds = Math.floor(adjustedDuration % 60);
+            totalTimeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        // 平均速度を計算・表示
+        const averageSpeed = speedData.reduce((sum, speed) => sum + speed, 0) / speedData.length;
+        const averageSpeedDisplay = document.getElementById('averageSpeedDisplay');
+        if (averageSpeedDisplay) {
+            averageSpeedDisplay.textContent = `${averageSpeed.toFixed(1)}x`;
+        }
+        
+        console.log(`⏱️ Timeline duration updated: ${originalDuration.toFixed(1)}s → ${adjustedDuration.toFixed(1)}s (avg: ${averageSpeed.toFixed(1)}x)`);
+    }
+    
+    // === 動画時間軸同期システム ===
+    setupVideoTimelineSync() {
+        console.log('⏰ Setting up video-timeline synchronization...');
+        // 動画ロード時に自動実行される
+    }
+    
+    syncSpeedCurveToVideoTime() {
+        if (!this.selectedClip || !this.videoDuration) {
+            console.warn('⚠️ No video loaded for timeline sync');
+            return;
+        }
+        
+        // ピクセル/秒の計算 - タイムライン全体の幅を使用
+        const timelineWidth = document.getElementById('timeline')?.offsetWidth || 800;
+        this.pixelsPerSecond = timelineWidth / this.videoDuration;
+        this.speedCurveWidth = timelineWidth;
+        
+        // 速度曲線SVGの幅を更新（まず基本機能を優先）
+        // this.updateSpeedCurveSvgWidth(); // 一時的に無効化して基本機能を復旧
+        
+        // タイムラインルーラーの更新
+        this.updateTimelineRuler();
+        
+        // 速度曲線の制御点を動画時間に基づいて再配置
+        this.redistributeSpeedPoints();
+        
+        // 時間軸ラベル更新
+        this.updateTimeAxisLabels();
+        
+        // シークバーの最大値も動画尺に合わせる
+        this.updateTimelineSeekbar();
+        
+        console.log(`⏰ Timeline synced to video: ${this.videoDuration.toFixed(2)}s = ${timelineWidth}px (${this.pixelsPerSecond.toFixed(2)}px/s)`);
+    }
+    
+    updateSpeedCurveSvgWidth() {
+        const speedCurveSvgWide = document.getElementById('speedCurveSvgWide');
+        if (!speedCurveSvgWide) return;
+        
+        // SVG要素の幅を動画尺に合わせて更新
+        speedCurveSvgWide.setAttribute('width', this.speedCurveWidth);
+        speedCurveSvgWide.setAttribute('viewBox', `0 0 ${this.speedCurveWidth} 160`);
+        
+        // 背景要素も幅を更新
+        const bgRect = speedCurveSvgWide.querySelector('rect');
+        if (bgRect) {
+            bgRect.setAttribute('width', this.speedCurveWidth);
+        }
+        
+        // グリッドパターンのpattern要素の幅を更新
+        const fineGrid = speedCurveSvgWide.querySelector('#fineGridWide');
+        const majorGrid = speedCurveSvgWide.querySelector('#majorGridWide');
+        
+        // すべての線要素の幅を更新
+        const lines = speedCurveSvgWide.querySelectorAll('line');
+        lines.forEach(line => {
+            if (line.getAttribute('x2') === '100%' || line.getAttribute('x2') === '280') {
+                line.setAttribute('x2', this.speedCurveWidth);
+            }
+        });
+        
+        // 速度曲線パス自体を更新
+        const speedPath = speedCurveSvgWide.querySelector('#speedCurvePathWide');
+        if (speedPath && this.speedCurvePointsWide) {
+            this.updateSpeedCurveWide();
+        }
+        
+        console.log(`📐 Speed curve SVG width updated: ${this.speedCurveWidth}px`);
+    }
+    
+    updateTimelineRuler() {
+        const rulerMarkers = document.getElementById('rulerMarkers');
+        if (!rulerMarkers || !this.videoDuration) return;
+        
+        rulerMarkers.innerHTML = '';
+        
+        // 動画尺に基づいて時間マーカーを生成
+        const markerInterval = Math.max(1, Math.floor(this.videoDuration / 10)); // 最大10個程度のマーカー
+        const timelineWidth = this.speedCurveWidth || 800;
+        
+        for (let time = 0; time <= this.videoDuration; time += markerInterval) {
+            const marker = document.createElement('div');
+            marker.className = 'time-marker';
+            marker.style.position = 'absolute';
+            marker.style.left = `${(time / this.videoDuration) * 100}%`;
+            marker.style.height = '100%';
+            marker.style.borderLeft = '1px solid var(--border-secondary)';
+            marker.style.fontSize = '10px';
+            marker.style.color = 'var(--text-tertiary)';
+            marker.textContent = `${time.toFixed(1)}s`;
+            rulerMarkers.appendChild(marker);
+        }
+        
+        console.log(`📏 Timeline ruler updated: ${this.videoDuration.toFixed(2)}s with ${Math.ceil(this.videoDuration / markerInterval)} markers`);
+    }
+    
+    updateTimelineSeekbar() {
+        const seekbar = document.getElementById('timelineSeekbar');
+        if (!seekbar || !this.videoDuration) return;
+        
+        // シークバーの最大値を動画時間（秒）×100に設定（0.01秒精度）
+        seekbar.max = Math.floor(this.videoDuration * 100);
+        seekbar.step = 1; // 0.01秒単位
+        
+        // 時間表示の更新
+        document.getElementById('totalTimeDisplay').textContent = this.formatTime(this.videoDuration);
+        
+        console.log(`⏰ Timeline seekbar updated: max=${seekbar.max} (${this.videoDuration.toFixed(2)}s)`);
+    }
+    
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        const ms = Math.floor((seconds % 1) * 100);
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+    }
+    
+    redistributeSpeedPoints() {
+        if (!this.speedCurvePointsWide) return;
+        
+        const pointCount = this.speedCurvePointsWide.length;
+        
+        // 制御点を動画時間に等間隔で配置（speedCurveWidthに基づく）
+        for (let i = 0; i < pointCount; i++) {
+            const xPosition = (i / (pointCount - 1)) * this.speedCurveWidth;
+            this.speedCurvePointsWide[i].x = xPosition;
+            
+            // DOM要素も更新
+            const pointElement = document.getElementById(`controlPoint${i}Wide`);
+            if (pointElement) {
+                pointElement.setAttribute('cx', xPosition);
+            }
+        }
+        
+        // ベジエ曲線パスも更新
         this.updateSpeedCurveWide();
-        console.log('🔄 Wide speed curve reset to default');
+        
+        console.log(`🔄 Speed points redistributed across ${this.speedCurveWidth}px width`);
+    }
+    
+    updateTimeAxisLabels() {
+        // SVG内の時間軸ラベルを動画時間で更新
+        const speedCurveSvg = document.getElementById('speedCurveSvgWide');
+        if (!speedCurveSvg) return;
+        
+        // 既存の時間ラベル削除
+        const existingLabels = speedCurveSvg.querySelectorAll('.time-label');
+        existingLabels.forEach(label => label.remove());
+        
+        // 新しい時間ラベル生成（5つの時点）
+        for (let i = 0; i <= 4; i++) {
+            const timePosition = (i / 4) * this.videoDuration;
+            const pixelPosition = timePosition * this.pixelsPerSecond;
+            
+            const timeLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            timeLabel.setAttribute('x', pixelPosition);
+            timeLabel.setAttribute('y', '155');
+            timeLabel.setAttribute('fill', '#b0b0b0');
+            timeLabel.setAttribute('font-size', '9');
+            timeLabel.setAttribute('font-family', 'Consolas');
+            timeLabel.setAttribute('text-anchor', 'middle');
+            timeLabel.classList.add('time-label');
+            timeLabel.textContent = `${timePosition.toFixed(1)}s`;
+            
+            speedCurveSvg.appendChild(timeLabel);
+        }
+    }
+    
+    pixelToTime(pixelX) {
+        if (this.pixelsPerSecond === 0) return 0;
+        return pixelX / this.pixelsPerSecond;
+    }
+    
+    timeToPixel(timeSeconds) {
+        return timeSeconds * this.pixelsPerSecond;
+    }
+    
+    // === タイムラインクリップ選択・削除システム ===
+    setupTimelineClipSelection() {
+        console.log('🎯 Setting up timeline clip selection system...');
+        // 動的に追加されるクリップの選択処理は setToTimeline() で実装
+    }
+    
+    setupTimelineDeleteButtons() {
+        const deleteBtn = document.getElementById('deleteSelectedClip');
+        const clearBtn = document.getElementById('clearTimeline');
+        
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                this.deleteSelectedClip();
+            });
+        }
+        
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this.clearTimeline();
+            });
+        }
+        
+        console.log('🗑️ Timeline delete buttons initialized');
+    }
+    
+    selectClip(clipIndex) {
+        // 既存選択を解除
+        this.deselectAllClips();
+        
+        // 新しいクリップを選択
+        this.selectedClipIndex = clipIndex;
+        
+        if (clipIndex >= 0 && clipIndex < this.timelineClips.length) {
+            const clipElement = document.querySelector(`[data-clip-index="${clipIndex}"]`);
+            if (clipElement) {
+                clipElement.classList.add('selected');
+            }
+            
+            // 削除ボタンを有効化
+            const deleteBtn = document.getElementById('deleteSelectedClip');
+            if (deleteBtn) {
+                deleteBtn.disabled = false;
+            }
+            
+            console.log(`📍 Clip ${clipIndex} selected: ${this.timelineClips[clipIndex]?.name || 'Unknown'}`);
+        }
+    }
+    
+    deselectAllClips() {
+        const selectedClips = document.querySelectorAll('.timeline-clip.selected');
+        selectedClips.forEach(clip => clip.classList.remove('selected'));
+        
+        this.selectedClipIndex = -1;
+        
+        // 削除ボタンを無効化
+        const deleteBtn = document.getElementById('deleteSelectedClip');
+        if (deleteBtn) {
+            deleteBtn.disabled = true;
+        }
+    }
+    
+    deleteSelectedClip() {
+        if (this.selectedClipIndex === -1 || this.selectedClipIndex >= this.timelineClips.length) {
+            console.warn('⚠️ No clip selected for deletion');
+            return;
+        }
+        
+        const clipToDelete = this.timelineClips[this.selectedClipIndex];
+        
+        // クリップをタイムラインから削除
+        this.timelineClips.splice(this.selectedClipIndex, 1);
+        
+        // DOM要素も削除
+        const clipElement = document.querySelector(`[data-clip-index="${this.selectedClipIndex}"]`);
+        if (clipElement) {
+            clipElement.remove();
+        }
+        
+        // インデックスを再調整
+        this.reindexTimelineClips();
+        
+        // 選択状態をリセット
+        this.deselectAllClips();
+        
+        // タイムライン表示を更新
+        this.updateTimelineInfo();
+        
+        // 削除されたクリップが現在再生中の場合は停止
+        if (this.selectedClip === clipToDelete.videoElement) {
+            this.stopLoop();
+            this.selectedClip = null;
+            this.isSet = false;
+        }
+        
+        console.log(`🗑️ Clip deleted: ${clipToDelete.name}`);
+        
+        // タイムラインが空になった場合
+        if (this.timelineClips.length === 0) {
+            this.showTimelinePlaceholder();
+        }
+    }
+    
+    clearTimeline() {
+        if (this.timelineClips.length === 0) {
+            console.warn('⚠️ Timeline is already empty');
+            return;
+        }
+        
+        // 確認ダイアログ
+        if (!confirm(`タイムライン上の全クリップ（${this.timelineClips.length}個）を削除しますか？`)) {
+            return;
+        }
+        
+        // 全クリップをクリア
+        this.timelineClips = [];
+        
+        // DOM要素をクリア
+        const timelineTrack = document.getElementById('timelineTrack');
+        if (timelineTrack) {
+            // プレイヘッドとプレースホルダー以外を削除
+            const clipsToRemove = timelineTrack.querySelectorAll('.timeline-clip');
+            clipsToRemove.forEach(clip => clip.remove());
+        }
+        
+        // 選択状態をリセット
+        this.deselectAllClips();
+        
+        // 再生停止
+        this.stopLoop();
+        this.selectedClip = null;
+        this.isSet = false;
+        
+        // プレースホルダー表示
+        this.showTimelinePlaceholder();
+        
+        // タイムライン情報更新
+        this.updateTimelineInfo();
+        
+        console.log('🔄 Timeline cleared - all clips removed');
+    }
+    
+    reindexTimelineClips() {
+        const clipElements = document.querySelectorAll('.timeline-clip');
+        clipElements.forEach((clipElement, newIndex) => {
+            clipElement.setAttribute('data-clip-index', newIndex.toString());
+        });
+    }
+    
+    showTimelinePlaceholder() {
+        const placeholder = document.querySelector('.timeline-placeholder');
+        if (placeholder) {
+            placeholder.style.display = 'block';
+        }
+    }
+    
+    hideTimelinePlaceholder() {
+        const placeholder = document.querySelector('.timeline-placeholder');
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+    }
+    
+    updateTimelineInfo() {
+        const timelineInfo = document.getElementById('timelineInfo');
+        if (timelineInfo) {
+            if (this.timelineClips.length === 0) {
+                timelineInfo.textContent = 'セット待機中...';
+            } else {
+                timelineInfo.textContent = `${this.timelineClips.length}クリップ セット済み`;
+            }
+        }
     }
 }
 
