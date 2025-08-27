@@ -1534,12 +1534,24 @@ class LOOOOPApp {
         const deltaTime = now - this.lastFrameTime;
         
         // 現在の速度を曲線から取得
-        const progress = this.currentFrame / this.totalFrames;
-        const speedIndex = Math.floor(progress * (this.speedCurveData.length - 1));
-        this.currentSpeed = this.speedCurveData[speedIndex] || 1.0;
+        if (this.totalFrames > 0 && this.speedCurveData && this.speedCurveData.length > 0) {
+            const progress = this.currentFrame / this.totalFrames;
+            const speedIndex = Math.floor(progress * (this.speedCurveData.length - 1));
+            let rawSpeed = this.speedCurveData[speedIndex] || 1.0;
+            
+            // フリーズ防止: 最小速度を0.1xに制限
+            this.currentSpeed = Math.max(0.1, Math.min(3.0, rawSpeed));
+        } else {
+            this.currentSpeed = 1.0; // デフォルト速度
+        }
         
         // 速度を反映したフレーム進行
         const frameDuration = 1000 / 30 / this.currentSpeed; // 30fps基準
+        
+        // デバッグ: 速度変化をログ（10フレームごと）
+        if (this.currentFrame % 10 === 0 && this.currentSpeed !== 1.0) {
+            console.log(`⚡ Speed: ${this.currentSpeed.toFixed(2)}x at frame ${this.currentFrame}/${this.totalFrames}`);
+        }
         
         if (deltaTime >= frameDuration) {
             this.currentFrame++;
@@ -1548,18 +1560,26 @@ class LOOOOPApp {
                 this.currentFrame = 0; // ループ
             }
             
-            // 非同期処理をブロッキングしないよう、Promiseで実行
-            this.drawCurrentFrame().catch(error => {
-                console.warn('⚠️ Draw error in animation:', error);
-            });
+            // パフォーマンス最適化: 描画頻度を調整（3フレームに1回）
+            const shouldDraw = (this.currentFrame % 3 === 0) || (this.currentSpeed > 2.0);
+            
+            if (shouldDraw) {
+                // 非同期処理をブロッキングしないよう、Promiseで実行
+                this.drawCurrentFrame().catch(error => {
+                    console.warn('⚠️ Draw error in animation:', error);
+                });
+            }
+            
             this.updateFrameInfo();
             
             // プレイヘッドの位置を更新（重要！）
             this.updatePlayhead();
             
-            // タイムラインインジケーターも更新
-            const currentProgress = this.currentFrame / (this.totalFrames - 1);
-            this.updateSpeedCurveTimelineIndicator(currentProgress);
+            // タイムラインインジケーター更新頻度を調整（10フレームに1回）
+            if (this.currentFrame % 10 === 0) {
+                const currentProgress = this.currentFrame / (this.totalFrames - 1);
+                this.updateSpeedCurveTimelineIndicator(currentProgress);
+            }
             
             this.lastFrameTime = now;
         }
@@ -1603,82 +1623,95 @@ class LOOOOPApp {
             }
         }
         
-        // ローカルフレームから時間を算出（正確なクリップフレーム使用）
-        const loopIndex = Math.floor(localFrame / (clip.frames.length + (clip.frames.length - 1)));
-        const frameInLoop = localFrame % (clip.frames.length + (clip.frames.length - 1));
+        // 最適化されたフレーム計算（逆再生時のカクツキ解消）
+        const forwardFrames = clip.frames.length;
+        const reverseFrames = forwardFrames - 1;
+        const totalFramesPerLoop = forwardFrames + reverseFrames;
         
+        const frameInLoop = localFrame % totalFramesPerLoop;
         let sourceFrameIndex;
-        if (isReverse) {
-            // 逆再生フレーム計算
-            const reverseIndex = frameInLoop - clip.frames.length;
-            sourceFrameIndex = clip.frames.length - 1 - reverseIndex;
-        } else {
-            // 正再生フレーム計算
+        
+        if (frameInLoop < forwardFrames) {
+            // 正再生部分（0 ～ forwardFrames-1）
             sourceFrameIndex = frameInLoop;
+        } else {
+            // 逆再生部分（forwardFrames ～ totalFramesPerLoop-1）
+            const reversePosition = frameInLoop - forwardFrames;
+            sourceFrameIndex = forwardFrames - 2 - reversePosition; // -2で最後のフレーム重複を回避
         }
         
-        // フレームインデックスの有効性チェック
-        if (sourceFrameIndex < 0 || sourceFrameIndex >= clip.frames.length) {
-            console.warn(`⚠️ Invalid frame index ${sourceFrameIndex} for clip with ${clip.frames.length} frames`);
-            return;
-        }
+        // 安全な範囲チェック（高速化）
+        sourceFrameIndex = Math.max(0, Math.min(sourceFrameIndex, forwardFrames - 1));
         
         const targetTime = clip.frames[sourceFrameIndex].time;
         
         // 詳細デバッグログ（フレーム切り替え時のみ）
         if (this.lastLoggedFrame !== this.currentFrame) {
-            console.log(`🎯 Frame ${this.currentFrame}: Clip="${clip.fileName}", Local=${localFrame}, Source=${sourceFrameIndex}, Time=${targetTime.toFixed(3)}s, ${isReverse ? 'REV' : 'FWD'}`);
+            const isReversePhase = frameInLoop >= forwardFrames;
+            console.log(`🎯 Frame ${this.currentFrame}: Clip="${clip.fileName}", Local=${localFrame}, Source=${sourceFrameIndex}, Time=${targetTime.toFixed(3)}s, ${isReversePhase ? 'REV' : 'FWD'}`);
             this.lastLoggedFrame = this.currentFrame;
         }
         
         try {
-            // ビデオをシーク（確実な完了待機）
-            if (Math.abs(this.hiddenVideo.currentTime - targetTime) > 0.03) {
+            // 超高速シーク処理（逆再生カクツキ防止）
+            const timeDiff = Math.abs(this.hiddenVideo.currentTime - targetTime);
+            if (timeDiff > 0.2) {
+                // 大きな時間差の場合のみシーク
                 this.hiddenVideo.currentTime = targetTime;
                 
-                // シーク完了を確実に待機
-                await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        console.warn('⚠️ Seek timeout');
-                        resolve();
-                    }, 100);
-                    
+                // 待機時間を最小化（5ms）
+                await new Promise(resolve => {
+                    const timeout = setTimeout(resolve, 5);
                     this.hiddenVideo.onseeked = () => {
                         clearTimeout(timeout);
                         resolve();
                     };
                 });
+            } else if (timeDiff > 0.05) {
+                // 小さな時間差は待機なしでシーク
+                this.hiddenVideo.currentTime = targetTime;
+            }
+            // 0.05秒以下の差は無視（カクツキ防止）
+            
+            // 高速Canvas描画（最適化版）
+            if (this.hiddenVideo.readyState < 2 || this.hiddenVideo.videoWidth === 0) {
+                return; // ビデオが準備できていない場合はスキップ
             }
             
-            // Canvas描画エラーハンドリング追加
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             
-            // 動画サイズチェック
-            if (this.hiddenVideo.videoWidth === 0 || this.hiddenVideo.videoHeight === 0) {
-                console.warn('⚠️ Video dimensions not ready');
-                return;
+            // 描画パラメータのキャッシュ
+            if (!this.cachedDrawParams || this.cachedDrawParams.videoWidth !== this.hiddenVideo.videoWidth) {
+                const videoAspect = this.hiddenVideo.videoWidth / this.hiddenVideo.videoHeight;
+                const canvasAspect = this.canvas.width / this.canvas.height;
+                
+                if (videoAspect > canvasAspect) {
+                    this.cachedDrawParams = {
+                        videoWidth: this.hiddenVideo.videoWidth,
+                        drawWidth: this.canvas.width,
+                        drawHeight: this.canvas.width / videoAspect,
+                        drawX: 0,
+                        drawY: (this.canvas.height - (this.canvas.width / videoAspect)) / 2
+                    };
+                } else {
+                    this.cachedDrawParams = {
+                        videoWidth: this.hiddenVideo.videoWidth,
+                        drawWidth: this.canvas.height * videoAspect,
+                        drawHeight: this.canvas.height,
+                        drawX: (this.canvas.width - (this.canvas.height * videoAspect)) / 2,
+                        drawY: 0
+                    };
+                }
             }
             
-            // アスペクト比維持して描画
-            const videoAspect = this.hiddenVideo.videoWidth / this.hiddenVideo.videoHeight;
-            const canvasAspect = this.canvas.width / this.canvas.height;
+            const params = this.cachedDrawParams;
             
-            let drawWidth, drawHeight, drawX, drawY;
+            this.ctx.drawImage(this.hiddenVideo, params.drawX, params.drawY, params.drawWidth, params.drawHeight);
             
-            if (videoAspect > canvasAspect) {
-                drawWidth = this.canvas.width;
-                drawHeight = drawWidth / videoAspect;
-                drawX = 0;
-                drawY = (this.canvas.height - drawHeight) / 2;
-            } else {
-                drawHeight = this.canvas.height;
-                drawWidth = drawHeight * videoAspect;
-                drawX = (this.canvas.width - drawWidth) / 2;
-                drawY = 0;
+            // デバッグログは30フレームに1回に削減
+            if (this.currentFrame % 30 === 0) {
+                console.log(`🎨 Optimized draw: Clip(${clip.name || clip.fileName}) Global(${this.currentFrame}/${this.totalFrames})`);
             }
-            
-            this.ctx.drawImage(this.hiddenVideo, drawX, drawY, drawWidth, drawHeight);
-            console.log(`🎨 Frame drawn: Clip(${clip.name}) Frame(${sourceFrameIndex}/${clip.frames.length}) Global(${this.currentFrame}/${this.totalFrames})`);
             
         } catch (error) {
             console.error('❌ Draw error:', error);
@@ -2752,20 +2785,31 @@ class LOOOOPApp {
         console.log('🔄 Canvas speed curve reset to default');
     }
     
-    // Canvas速度曲線データをLoopEngineに適用
+    // Canvas速度曲線データをLoopEngineおよび直接アニメーションに適用
     applySpeedCurveToEngine() {
-        if (!this.loopEngine || !this.speedCurvePoints || this.speedCurvePoints.length < 2) {
-            console.log('⚠️ LoopEngine not available or insufficient speed curve data');
+        if (!this.speedCurvePoints || this.speedCurvePoints.length < 2) {
+            console.log('⚠️ Insufficient speed curve data');
             return;
         }
         
         // Canvasの座標系から速度値に変換して配列データを生成
         const speedData = this.generateSpeedDataFromCanvas();
         
-        // LoopEngineに速度曲線データを設定
-        this.loopEngine.setSpeedCurve(speedData);
+        // 🔥 重要: 直接アニメーション用にメイン速度データを更新（複数クリップ対応）
+        this.speedCurveData = speedData;
         
-        console.log('🎯 Speed curve applied to LoopEngine:', speedData.length, 'data points');
+        // デバッグ: 速度データの範囲を確認
+        const minSpeed = Math.min(...speedData);
+        const maxSpeed = Math.max(...speedData);
+        console.log(`🔍 Speed data range: ${minSpeed.toFixed(2)}x ~ ${maxSpeed.toFixed(2)}x (${speedData.length} points)`);
+        
+        // LoopEngine（単一クリップ）にも適用
+        if (this.loopEngine && this.timelineClips && this.timelineClips.length === 1) {
+            this.loopEngine.setSpeedCurve(speedData);
+            console.log('⚡ Speed curve applied to LoopEngine (single clip)');
+        }
+        
+        console.log(`🎯 Speed curve applied: ${speedData.length} points (${this.timelineClips ? this.timelineClips.length : 0} clips)`);
     }
     
     // Canvas座標から速度データ配列を生成
@@ -2822,16 +2866,25 @@ class LOOOOPApp {
         return 1.0;
     }
     
-    // y座標から速度値に変換
+    // y座標から速度値に変換（Canvas版 - 修正版）
     yToSpeed(y) {
         const margin = { top: 30, bottom: 40 };
         const graphHeight = this.canvasHeight - margin.top - margin.bottom;
         
-        // y座標を速度値に変換（上が速い、下が遅い）
-        const normalizedY = (this.canvasHeight - margin.bottom - y) / graphHeight;
-        const speed = 0.1 + normalizedY * 2.9; // 0.1x ～ 3.0x
+        // y座標を正規化（上が速い、下が遅い）
+        const normalizedY = Math.max(0, Math.min(1, (y - margin.top) / graphHeight));
         
-        return Math.max(0.1, Math.min(3.0, speed));
+        // 反転：上（y=0）が高速3.0x、下（y=1）が低速0.1x
+        const speed = 3.0 - (normalizedY * 2.9);
+        
+        const clampedSpeed = Math.max(0.1, Math.min(3.0, speed));
+        
+        // デバッグ: 座標変換をログ
+        if (Math.random() < 0.01) { // 1%の確率でログ
+            console.log(`📐 yToSpeed: y=${y.toFixed(1)} -> normalized=${normalizedY.toFixed(3)} -> speed=${clampedSpeed.toFixed(2)}x`);
+        }
+        
+        return clampedSpeed;
     }
     
     // === タイムライン・速度曲線同期システム ===
@@ -3314,61 +3367,34 @@ class LOOOOPApp {
         }
     }
     
-    // 高速な動画切り替え処理（複数動画連結用）
+    // 超高速な動画切り替え処理（フリーズ防止版）
     async switchToClipQuick(clip) {
-        return new Promise((resolve, reject) => {
-            // 既に正しい動画がロードされている場合はスキップ
-            const currentSrc = this.hiddenVideo.src;
-            const clipPath = clip.filePath.replace(/\\/g, '/');
-            
-            if (currentSrc && currentSrc.includes(clipPath)) {
-                this.currentClipId = clip.id;
-                resolve();
-                return;
-            }
-            
-            console.log(`🔄 Quick loading video: ${clip.fileName}`);
-            
-            // タイムアウト設定（1秒）
-            let resolved = false;
-            const timeout = setTimeout(() => {
-                if (!resolved) {
-                    resolved = true;
-                    console.warn('⚠️ Video loading timeout, using fallback');
-                    resolve(); // タイムアウトでもresolveして描画を継続
-                }
-            }, 1000);
-            
-            const onReady = () => {
-                if (!resolved) {
-                    resolved = true;
-                    clearTimeout(timeout);
-                    this.hiddenVideo.oncanplaythrough = null;
-                    this.hiddenVideo.onerror = null;
-                    this.currentClipId = clip.id;
-                    console.log(`✅ Quick switch to: ${clip.fileName}`);
-                    resolve();
-                }
-            };
-            
-            const onError = (error) => {
-                if (!resolved) {
-                    resolved = true;
-                    clearTimeout(timeout);
-                    this.hiddenVideo.oncanplaythrough = null;
-                    this.hiddenVideo.onerror = null;
-                    console.error('❌ Video loading error:', error);
-                    resolve(); // エラーでもresolveして描画を継続
-                }
-            };
-            
-            // イベントリスナー設定
-            this.hiddenVideo.oncanplaythrough = onReady;
-            this.hiddenVideo.onerror = onError;
-            
-            // 動画切り替え実行
+        // パフォーマンス優先: 同期処理で即座に切り替え
+        const currentSrc = this.hiddenVideo.src;
+        const clipPath = clip.filePath.replace(/\\/g, '/');
+        
+        if (currentSrc && currentSrc.includes(clipPath)) {
+            this.currentClipId = clip.id;
+            return; // 既に正しい動画の場合は即座にreturn
+        }
+        
+        // 非同期読み込みを待たずに切り替え実行
+        try {
             this.hiddenVideo.src = clip.filePath;
-        });
+            this.currentClipId = clip.id;
+            
+            // readyStateチェック（待機なし）
+            if (this.hiddenVideo.readyState >= 2) {
+                console.log(`⚡ Instant switch to: ${clip.fileName}`);
+            } else {
+                console.log(`🔄 Async loading: ${clip.fileName}`);
+            }
+        } catch (error) {
+            console.warn('⚠️ Video switch error (continuing):', error);
+        }
+        
+        // 待機せずに即座に完了
+        return Promise.resolve();
     }
 }
 
